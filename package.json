@@ -1,0 +1,9 @@
+{
+  "name": "job-scraper-project",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "npm install --prefix job-scraper-frontend && npm run build --prefix job-scraper-frontend && npm install --prefix job-scraper-backend",
+    "start": "node job-scraper-backend/index.js"
+  }
+}

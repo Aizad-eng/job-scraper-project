@@ -47,7 +47,7 @@ export const startScrape = async (req, res) => {
             },
         });
 
-        const webhookUrl = `${process.env.PUBLIC_BASE_URL}/api/apify-webhook`;
+        const webhookUrl = `${process.env.PUBLIC_BASE_URL}/api/apify-webhook?s=${process.env.WEBHOOK_SECRET}`;
         const apifyRuns = [];
 
         // multiple keywords => multiple queries, one per platform

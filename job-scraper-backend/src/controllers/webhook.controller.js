@@ -142,7 +142,7 @@ const runPipeline = async (job) => {
             const exportJob = await startContactExport({
                 companyIds,
                 personaTitles: job.inputs.personaTitles,
-                webhookUrl: `${process.env.PUBLIC_BASE_URL}/api/aiark-webhook`,
+                webhookUrl: `${process.env.PUBLIC_BASE_URL}/api/aiark-webhook?s=${process.env.WEBHOOK_SECRET}`,
             });
 
             job.aiArkExport = { trackId: exportJob.trackId, state: exportJob.state };

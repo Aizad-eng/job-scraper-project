@@ -390,3 +390,19 @@ body {
     grid-template-columns: 1fr;
   }
 }
+
+.gate {
+  max-width: 380px;
+  margin: 12vh auto 0;
+}
+
+.gate form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.gate .primary {
+  width: 100%;
+  justify-content: center;
+}
