@@ -6,7 +6,8 @@ import { classifyCompanies } from '../services/classification.service.js';
 import { groupByCompany, normalizeJob, stripJobFields } from '../helpers/jobHelpers.js';
 import {
     resolveCompanies,
-    lookupContactsWithoutEmail,
+    searchCandidates,
+    selectContacts,
     startContactExport,
     enrichWithPhones,
 } from '../services/contactLookup.service.js';
@@ -138,38 +139,62 @@ const runPipeline = async (job) => {
             return;
         }
 
+        // ---- FREE SEARCH FIRST ----
+        // AI-Ark charges per record an export delivers, not per search. So we
+        // look at who exists for free, pick who we want, and only pay for those.
+        const candidates = await searchCandidates({
+            companyIds,
+            personaTitles: job.inputs.personaTitles,
+        });
+
+        const { selected, stats } = selectContacts(candidates);
+
+        console.log(
+            `Job ${job.jobId}: people search found ${stats.found}, ` +
+            `${stats.droppedNoCompany} had no company, ${stats.droppedOverCap} over the per-company cap, ` +
+            `${stats.selected} selected`
+        );
+
+        job.contactStats = stats;
+        job.markModified('contactStats');
+        await job.save();
+
+        if (!selected.length) {
+            job.status = JOB_STATUS.EMPTY;
+            job.emptyReason =
+                'Companies were found, but nobody at them matched your persona titles. Try broadening the titles.';
+            await job.save();
+            return;
+        }
+
         if (job.inputs.needEmail) {
+            // Pay for exactly the people we selected, not three times as many.
             const exportJob = await startContactExport({
                 companyIds,
                 personaTitles: job.inputs.personaTitles,
+                size: selected.length,
                 webhookUrl: `${process.env.PUBLIC_BASE_URL}/api/aiark-webhook?s=${process.env.WEBHOOK_SECRET}`,
             });
 
-            job.aiArkExport = { trackId: exportJob.trackId, state: exportJob.state };
+            job.aiArkExport = {
+                trackId: exportJob.trackId,
+                state: exportJob.state,
+                requestedSize: selected.length,
+            };
             job.markModified('aiArkExport');
             await job.save();
 
-            console.log(`AI-Ark export started: ${exportJob.trackId}`);
+            console.log(
+                `AI-Ark export started: ${exportJob.trackId} for ${selected.length} people ` +
+                `(was ${companyIds.length * 2 * 3} under the old sizing)`
+            );
             // pipeline resumes in the AI-Ark webhook
         } else {
-            let contacts = await lookupContactsWithoutEmail({
-                companyIds,
-                personaTitles: job.inputs.personaTitles,
-            });
-
-            if (!contacts.length) {
-                job.status = JOB_STATUS.EMPTY;
-                job.emptyReason = 'Companies were found, but nobody at them matched your persona titles. Try broadening the titles.';
-                job.aiArkExport.state = 'DONE';
-                job.markModified('aiArkExport');
-                await job.save();
-                return;
-            }
+            let contacts = selected;
 
             if (job.inputs.needPhone) {
                 contacts = await enrichWithPhones(contacts);
             }
-
 
             job.contacts = contacts;
             job.status = JOB_STATUS.READY;

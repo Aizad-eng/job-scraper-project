@@ -2,6 +2,7 @@ import {
     DEFAULT_STAFFING_WORDS,
     STAFFING_MATCH_FIELDS,
     DEFAULT_EMPLOYEE_MATCH_MODE,
+    DEFAULT_MATCH_IN,
     REMOVAL_REASON,
 } from '../constants/filterConstants.js';
 import { isWithinEmployeeRange, findStaffingWord, matchesFilterKeywords } from '../helpers/jobHelpers.js';

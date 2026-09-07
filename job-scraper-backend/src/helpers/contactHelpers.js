@@ -35,23 +35,41 @@ const SENIORITY_RANK = {
     'mid-level': 10, entry: 11, intern: 12,
 };
 
+/**
+ * Keep the most senior `limit` people per company.
+ *
+ * Returns { kept, droppedNoCompany } rather than a bare array. People with no
+ * company identifier at all used to be discarded here with no trace, which
+ * made it impossible to tell paid-for-then-binned contacts apart from
+ * contacts that were never returned.
+ */
 export const capContactsPerCompany = (contacts, limit = MAX_CONTACTS_PER_COMPANY) => {
     const byCompany = new Map();
+    let droppedNoCompany = 0;
 
     contacts.forEach((contact) => {
         const key = contact.companyId || contact.companyDomain || contact.companyName;
-        if (!key) return;
+        if (!key) {
+            droppedNoCompany += 1;
+            return;
+        }
         if (!byCompany.has(key)) byCompany.set(key, []);
         byCompany.get(key).push(contact);
     });
 
-    const capped = [];
+    if (droppedNoCompany) {
+        console.warn(
+            `${droppedNoCompany} contact(s) had no company id, domain or name and were dropped`
+        );
+    }
+
+    const kept = [];
     byCompany.forEach((group) => {
         const sorted = [...group].sort(
             (a, b) => (SENIORITY_RANK[a.seniority] || 99) - (SENIORITY_RANK[b.seniority] || 99)
         );
-        capped.push(...sorted.slice(0, limit));
+        kept.push(...sorted.slice(0, limit));
     });
 
-    return capped;
+    return { kept, droppedNoCompany };
 };

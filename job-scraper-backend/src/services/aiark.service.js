@@ -1,12 +1,30 @@
 import axios from 'axios';
-import { AIARK_BASE_URL, AIARK_ENDPOINTS } from '../constants/aiArkConstants.js';
+import { AIARK_BASE_URL, AIARK_ENDPOINTS, AIARK_MIN_REQUEST_INTERVAL_MS } from '../constants/aiArkConstants.js';
 
 const aiArkClient = axios.create({
     baseURL: AIARK_BASE_URL,
     headers: { 'Content-Type': 'application/json' },
 });
 
-aiArkClient.interceptors.request.use((config) => {
+// ---------------------------------------------------------------------------
+// Rate limiting. AI-Ark allows 5 requests/second. Every call in this file goes
+// through the interceptor below, which serialises requests and spaces them by
+// AIARK_MIN_REQUEST_INTERVAL_MS, so no caller can accidentally burst.
+// ---------------------------------------------------------------------------
+let lastRequestAt = 0;
+let queue = Promise.resolve();
+
+const throttle = () => {
+    queue = queue.then(async () => {
+        const wait = lastRequestAt + AIARK_MIN_REQUEST_INTERVAL_MS - Date.now();
+        if (wait > 0) await new Promise((r) => setTimeout(r, wait));
+        lastRequestAt = Date.now();
+    });
+    return queue;
+};
+
+aiArkClient.interceptors.request.use(async (config) => {
+    await throttle();
     config.headers['X-TOKEN'] = process.env.AI_ARK_API_KEY;
     return config;
 });
@@ -36,7 +54,7 @@ export const resolveCompanyIds = async (domains) => {
 };
 
 // people search only — no emails
-export const searchPeople = async ({ companyIds, personaTitles, size = 25 }) => {
+export const searchPeople = async ({ companyIds, personaTitles, size = 25, page = 0 }) => {
     const { data } = await aiArkClient.post(AIARK_ENDPOINTS.PEOPLE_SEARCH, {
         contact: {
             company: { latest: { any: { include: companyIds } } },
@@ -46,7 +64,7 @@ export const searchPeople = async ({ companyIds, personaTitles, size = 25 }) => 
                 },
             },
         },
-        page: 0,
+        page,
         size,
     });
 
@@ -70,6 +88,13 @@ export const exportPeopleWithEmail = async ({ companyIds, personaTitles, size, w
     });
 
     return data; // { trackId, statistics, state }
+};
+
+// How many records an export actually produced. Defined in the constants but
+// never called before, which is why nobody could explain the credit charges.
+export const fetchExportStatistics = async (trackId) => {
+    const { data } = await aiArkClient.get(AIARK_ENDPOINTS.EXPORT_STATISTICS(trackId));
+    return data;
 };
 
 export const fetchExportResults = async (trackId, page = 0, size = 100) => {

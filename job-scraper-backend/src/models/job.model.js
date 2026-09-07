@@ -40,6 +40,17 @@ const jobSchema = new mongoose.Schema(
         aiArkExport: {
             trackId: { type: String, default: null },
             state: { type: String, default: null },
+            // How many records we asked and paid for, and what came back.
+            requestedSize: { type: Number, default: null },
+            reportedTotal: { type: Number, default: null },
+            deliveredCount: { type: Number, default: null },
+        },
+        // Where people went between the free search and the final list.
+        contactStats: {
+            found: { type: Number, default: null },
+            droppedNoCompany: { type: Number, default: null },
+            droppedOverCap: { type: Number, default: null },
+            selected: { type: Number, default: null },
         },
         error: { type: String, default: null },
         emptyReason: { type: String, default: null },
