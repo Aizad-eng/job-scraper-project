@@ -10,7 +10,7 @@ import {
     DELIVERY_PROGRESS_EVERY,
 } from '../constants/deliveryConstants.js';
 import { withRetry, isTransientHttpError } from '../helpers/limiter.js';
-import { groupByCompany } from '../helpers/jobHelpers.js';
+import { groupByCompany, daysSincePosted } from '../helpers/jobHelpers.js';
 
 // ---------------------------------------------------------------------------
 // Payload shapes. Flat keys so Clay / Sheets / Zapier map them to columns.
@@ -22,6 +22,7 @@ const jobFields = (job) => ({
     applyUrl: job.applyUrl ?? null,
     jobLocation: job.location ?? null,
     postedAt: job.postedAt ?? null,
+    daysSincePosted: daysSincePosted(job.postedAt),
     employmentType: job.employmentType ?? null,
     seniorityLevel: job.seniorityLevel ?? null,
     jobFunction: job.jobFunction ?? null,
@@ -77,12 +78,18 @@ const buildCompanyPayload = (company, meta) => {
         firstJobUrl: first.link ?? null,
         firstJobLocation: first.location ?? null,
         firstJobPostedAt: first.postedAt ?? null,
+        firstJobDaysSincePosted: daysSincePosted(first.postedAt),
+        newestJobDaysSincePosted: company.jobs
+            .map((job) => daysSincePosted(job.postedAt))
+            .filter((d) => d !== null)
+            .reduce((min, d) => (min === null || d < min ? d : min), null),
         allJobTitles: company.jobs.map((job) => job.title).filter(Boolean).join(' | '),
         jobs: company.jobs.map((job) => ({
             title: job.title ?? null,
             url: job.link ?? null,
             location: job.location ?? null,
             postedAt: job.postedAt ?? null,
+            daysSincePosted: daysSincePosted(job.postedAt),
             seniorityLevel: job.seniorityLevel ?? null,
             employmentType: job.employmentType ?? null,
             salaryMinPerYear: job.salaryMinPerYear ?? null,

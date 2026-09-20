@@ -60,10 +60,13 @@ export const resolveSalaries = async (jobs, { useClaude = true, deps = {} } = {}
     const needClaude = [];
 
     jobs.forEach((job) => {
-        // 1. numeric annual figures straight from the board (Indeed)
-        if (Number.isFinite(Number(job.salaryMinPerYear)) || Number.isFinite(Number(job.salaryMaxPerYear))) {
-            const min = Number(job.salaryMinPerYear) || Number(job.salaryMaxPerYear);
-            const max = Number(job.salaryMaxPerYear) || min;
+        // 1. numeric annual figures straight from the board (Indeed).
+        //    null / undefined / 0 do not count — Number(null) is 0.
+        const boardMin = job.salaryMinPerYear === null || job.salaryMinPerYear === undefined ? NaN : Number(job.salaryMinPerYear);
+        const boardMax = job.salaryMaxPerYear === null || job.salaryMaxPerYear === undefined ? NaN : Number(job.salaryMaxPerYear);
+        if ((Number.isFinite(boardMin) && boardMin > 0) || (Number.isFinite(boardMax) && boardMax > 0)) {
+            const min = boardMin > 0 ? boardMin : boardMax;
+            const max = boardMax > 0 ? boardMax : min;
             job.salaryMinPerYear = Math.round(min);
             job.salaryMaxPerYear = Math.round(max);
             job.salaryCurrency = job.salaryCurrency || null;

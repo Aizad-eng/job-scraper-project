@@ -280,3 +280,11 @@ export const isBankVpTitle = (job) => {
     if (phraseMatches(title, 'president') && !phraseMatches(title, 'vice president') && !phraseMatches(title, 'assistant vice president')) return false;
     return BANK_VP_TITLE_WORDS.some((w) => phraseMatches(title, w));
 };
+
+// Whole days between the posting date and now. null when the date is unusable.
+export const daysSincePosted = (postedAt, now = Date.now()) => {
+    if (!postedAt) return null;
+    const time = new Date(postedAt).getTime();
+    if (!Number.isFinite(time)) return null;
+    return Math.max(0, Math.floor((now - time) / 86400000));
+};

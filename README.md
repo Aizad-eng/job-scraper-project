@@ -175,6 +175,7 @@ One row per **job listing** (default):
   "applyUrl": "…",
   "jobLocation": "Austin, Texas, United States",
   "postedAt": "2026-09-18",
+  "daysSincePosted": 2,
   "employmentType": "Full-time",
   "seniorityLevel": "Mid-Senior level",
   "jobFunction": "Engineering",
@@ -213,7 +214,7 @@ One row per **job listing** (default):
 
 Rows from LinkedIn and Indeed have **exactly the same keys**. Each actor's own field names (`company` vs `companyName` vs `company_name`, `url` vs `link`, `companyEmployeeRange` vs `companyEmployeesCount`, and so on) are mapped to this one shape in `jobHelpers.js`, with alternates so a renamed key on either actor cannot silently blank a column. `platform` says which board the row came from and `searchKeyword` which title found it. `companyProfileUrl` is the LinkedIn company page or the Indeed company page. Fields a board does not provide (Indeed has no seniority level, LinkedIn has no annualised salary) are `null`.
 
-One row per **company** carries the same company fields plus `openRolesFound`, `firstJobTitle`, `firstJobUrl`, `firstJobLocation`, `firstJobPostedAt`, `allJobTitles` (pipe-separated) and a nested `jobs` array.
+One row per **company** carries the same company fields plus `openRolesFound`, `firstJobTitle`, `firstJobUrl`, `firstJobLocation`, `firstJobPostedAt`, `firstJobDaysSincePosted`, `newestJobDaysSincePosted`, `allJobTitles` (pipe-separated) and a nested `jobs` array.
 
 `isStaffingAgency` is `true`/`false` when the company check decided, `null` when it answered Unknown or agency checks are off, and `false` after the word screen only. `aiSource` is `scrapingdog`, `scrapingdog+claude`, `gpt`, `perplexity` or `skipped`.
 
