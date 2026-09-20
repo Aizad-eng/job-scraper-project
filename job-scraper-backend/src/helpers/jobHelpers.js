@@ -50,28 +50,41 @@ export const stripJobFields = (job) => {
     return cleaned;
 };
 
+// Lower-case, punctuation -> spaces, padded, so phrases can be matched as
+// whole words: "v.p. sales" -> " v p sales ", "Director, Finance" -> " director finance ".
+// + and # survive so "c++" and "c#" still work.
+const normalizeForMatch = (text) =>
+    ` ${String(text || '').toLowerCase().replace(/[^a-z0-9+#]+/g, ' ').trim()} `;
+
 const buildHaystack = (job, matchIn) =>
-    (matchIn || [])
-        .map((field) => job[MATCH_IN_FIELD_MAP[field]] || '')
-        .join(' ')
-        .toLowerCase();
+    normalizeForMatch(
+        (matchIn || []).map((field) => job[MATCH_IN_FIELD_MAP[field]] || '').join(' ')
+    );
+
+// Whole-word: "cto" matches "CTO" but not "director"; "vp" not "vpn".
+// Substring: the old behaviour, "react" matches "reactjs".
+export const phraseMatches = (haystack, phrase, wholeWord = true) => {
+    const needle = normalizeForMatch(phrase).trim();
+    if (!needle) return false;
+    return wholeWord ? haystack.includes(` ${needle} `) : haystack.includes(needle);
+};
 
 // true if ANY keyword appears in ANY of the selected fields
-export const matchesFilterKeywords = (job, keywords, matchIn) => {
+export const matchesFilterKeywords = (job, keywords, matchIn, wholeWord = true) => {
     if (!keywords?.length) return true;      // no keywords = filter off
     if (!matchIn?.length) return true;       // no fields selected = filter off
 
     const haystack = buildHaystack(job, matchIn);
     if (!haystack.trim()) return false;
 
-    return keywords.some((keyword) => haystack.includes(keyword.toLowerCase().trim()));
+    return keywords.some((keyword) => phraseMatches(haystack, keyword, wholeWord));
 };
 
 // the excluded word that appears in the selected fields, or null
-export const findExcludedWord = (job, words, matchIn) => {
+export const findExcludedWord = (job, words, matchIn, wholeWord = true) => {
     if (!words?.length || !matchIn?.length) return null;
     const haystack = buildHaystack(job, matchIn);
-    return words.find((word) => haystack.includes(word.toLowerCase().trim())) || null;
+    return words.find((word) => phraseMatches(haystack, word, wholeWord)) || null;
 };
 
 const industryText = (job) =>

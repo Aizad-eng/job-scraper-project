@@ -3,6 +3,7 @@ import TagInput from "./TagInput.jsx";
 import ChipGroup from "./ChipGroup.jsx";
 import ScheduleFields from "./ScheduleFields.jsx";
 import { REPEAT_OPTIONS, DEFAULT_SCHEDULE_FIELDS, DEFAULT_LAUNCH_SPACING_MINUTES } from "../constants/scheduleConstants.js";
+import { PRESETS } from "../constants/presetConstants.js";
 import {
   PLATFORMS,
   DEFAULT_FORM_VALUES,
@@ -69,6 +70,13 @@ export default function SearchForm({
 
   const setField = (key, value) =>
     setValues((prev) => ({ ...prev, [key]: value }));
+
+  const [appliedPreset, setAppliedPreset] = useState(null);
+  const applyPreset = (preset) => {
+    setValues((prev) => ({ ...prev, ...preset.apply }));
+    setAppliedPreset(preset.id);
+    if (preset.apply.seniorityLevels?.length || preset.apply.employmentTypes?.length) setShowMore(true);
+  };
 
   const handleSubmit = () => {
     const found = {
@@ -285,6 +293,28 @@ export default function SearchForm({
           </div>
         </div>
 
+        <div className="field">
+          <span className="field-label">Presets</span>
+          <div className="choice-row is-compact">
+            {PRESETS.map((preset) => (
+              <button
+                type="button"
+                key={preset.id}
+                className={`choice ${appliedPreset === preset.id ? "is-on" : ""}`}
+                onClick={() => applyPreset(preset)}
+                title={preset.hint}
+              >
+                {preset.label}
+              </button>
+            ))}
+          </div>
+          {appliedPreset && (
+            <p className="field-hint below">
+              {PRESETS.find((p) => p.id === appliedPreset)?.hint} You can still add or remove words below.
+            </p>
+          )}
+        </div>
+
         <TagInput
           label="Must mention"
           hint={FIELD_HINTS.filterKeywords}
@@ -319,6 +349,18 @@ export default function SearchForm({
             error={errors.excludeMatchIn}
             compact
           />
+        )}
+
+        {(values.filterKeywords.length > 0 || values.excludeWords.length > 0) && (
+          <label className="check">
+            <input
+              type="checkbox"
+              checked={values.wholeWordMatch}
+              onChange={(event) => setField("wholeWordMatch", event.target.checked)}
+            />
+            <span>Match whole words only</span>
+            <em>{FIELD_HINTS.wholeWordMatch}</em>
+          </label>
         )}
 
         <div className="field">

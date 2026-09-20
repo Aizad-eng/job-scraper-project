@@ -42,6 +42,7 @@ export const parseInputs = (body = {}) => {
         filterMatchIn: cleanList(body.filterMatchIn).length ? cleanList(body.filterMatchIn) : DEFAULT_MATCH_IN,
         excludeWords: cleanList(body.excludeWords),
         excludeMatchIn: cleanList(body.excludeMatchIn).length ? cleanList(body.excludeMatchIn) : DEFAULT_MATCH_IN,
+        wholeWordMatch: body.wholeWordMatch !== false,
         includeIndustries: cleanList(body.includeIndustries),
         excludeIndustries: cleanList(body.excludeIndustries),
         excludeCompanies: cleanList(body.excludeCompanies),

@@ -313,8 +313,10 @@ job-scraper-frontend/src/
 | **Company size**          | LinkedIn bands. A company is kept when its reported band overlaps any selected band.                 |
 | **Unknown size**          | Keep listings whose company has no size on the job board.                                            |
 | **Staffing agencies**     | Remove (words + AI), word screen only, keep but flag, or off.                                        |
-| **Must mention**          | Keep a listing only if the title and/or description contains one of these words.                     |
-| **Exclude words**         | Drop a listing if the title and/or description contains any of these.                                |
+| **Must mention**          | Keep a listing only if the title and/or description contains one of these words or phrases.          |
+| **Exclude words**         | Drop a listing if the title and/or description contains any of these. Checked after must-mention.    |
+| **Match whole words only** | On (default): "cto" matches *CTO* but not *director*, "vp" not *vpn*; phrases match as phrases, punctuation ignored ("v.p." = "V.P."). Off: substring match. |
+| **Presets**               | *Senior leadership (retained search)*: fills must-mention with C-level / VP / Director titles, excludes the title traps (assistant to, art director, principal engineer, HR business partner, part time…), sets seniority to Director + Executive and employment type to Full-time. Edit the lists afterwards as you like. |
 | **Only / exclude industries** | Substring match on the company's industry labels.                                                |
 | **Exclude companies**     | Company names (exact, case-insensitive) or domains.                                                  |
 | **Seniority / employment type** | LinkedIn labels. Listings without a value are kept.                                            |

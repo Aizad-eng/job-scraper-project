@@ -28,6 +28,7 @@ const jobSchema = new mongoose.Schema(
             filterMatchIn: [String],
             excludeWords: [String],
             excludeMatchIn: [String],
+            wholeWordMatch: { type: Boolean, default: true },
             includeIndustries: [String],
             excludeIndustries: [String],
             excludeCompanies: [String],

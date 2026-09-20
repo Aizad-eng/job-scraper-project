@@ -262,8 +262,10 @@ export default function RunProgress({ jobId, status, onReset, onRerun, onOpenSch
               <div className="wide">
                 <dt>Must mention</dt>
                 <dd>
-                  {status.inputs.filterKeywords.join(", ")}
-                  <em> in {status.inputs.filterMatchIn?.join(" or ")}</em>
+                  {status.inputs.filterKeywords.length > 12
+                    ? `${status.inputs.filterKeywords.slice(0, 12).join(", ")} … (${status.inputs.filterKeywords.length} words)`
+                    : status.inputs.filterKeywords.join(", ")}
+                  <em> in {status.inputs.filterMatchIn?.join(" or ")}{status.inputs.wholeWordMatch === false ? ", substring" : ", whole words"}</em>
                 </dd>
               </div>
             )}
@@ -271,7 +273,9 @@ export default function RunProgress({ jobId, status, onReset, onRerun, onOpenSch
               <div className="wide">
                 <dt>Excluded words</dt>
                 <dd>
-                  {status.inputs.excludeWords.join(", ")}
+                  {status.inputs.excludeWords.length > 12
+                    ? `${status.inputs.excludeWords.slice(0, 12).join(", ")} … (${status.inputs.excludeWords.length} words)`
+                    : status.inputs.excludeWords.join(", ")}
                   <em> in {status.inputs.excludeMatchIn?.join(" or ")}</em>
                 </dd>
               </div>

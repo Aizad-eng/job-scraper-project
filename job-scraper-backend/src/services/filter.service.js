@@ -31,6 +31,7 @@ export const applyRuleFilters = (jobs, options = {}) => {
         filterMatchIn = DEFAULT_MATCH_IN,
         excludeWords = [],
         excludeMatchIn = DEFAULT_MATCH_IN,
+        wholeWordMatch = true,
         includeIndustries = [],
         excludeIndustries = [],
         excludeCompanies = [],
@@ -75,12 +76,12 @@ export const applyRuleFilters = (jobs, options = {}) => {
             return;
         }
 
-        if (!matchesFilterKeywords(job, filterKeywords, filterMatchIn)) {
+        if (!matchesFilterKeywords(job, filterKeywords, filterMatchIn, wholeWordMatch)) {
             removed.push(removal(job, REMOVAL_REASON.KEYWORD_MISMATCH, `no match in ${filterMatchIn.join(' or ')}`));
             return;
         }
 
-        const excludedWord = findExcludedWord(job, excludeWords, excludeMatchIn);
+        const excludedWord = findExcludedWord(job, excludeWords, excludeMatchIn, wholeWordMatch);
         if (excludedWord) {
             removed.push(removal(job, REMOVAL_REASON.EXCLUDED_WORD, excludedWord));
             return;
