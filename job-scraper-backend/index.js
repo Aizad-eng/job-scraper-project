@@ -8,6 +8,7 @@ import connectDB from './src/config/db.js';
 import scrapeRoutes from './src/routes/scrape.routes.js';
 import webhookRoutes from './src/routes/webhook.routes.js';
 import scheduleRoutes from './src/routes/schedule.routes.js';
+import companyRoutes from './src/routes/company.routes.js';
 import { startScheduler } from './src/services/scheduler.service.js';
 import { requireAccessKey } from './src/middleware/auth.js';
 import { loginRateLimit } from './src/middleware/rateLimit.js';
@@ -41,6 +42,7 @@ app.post('/api/login', loginRateLimit, requireAccessKey, (req, res) => {
 app.use('/api', scrapeRoutes);
 app.use('/api', webhookRoutes);
 app.use('/api', scheduleRoutes);
+app.use('/api', companyRoutes);
 
 // ---------------------------------------------------------------------------
 // Frontend — the built React app is served by this same process, so the whole

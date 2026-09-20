@@ -109,33 +109,60 @@ export const findExcludedCompany = (job, excluded) => {
     }) || null;
 };
 
+// First non-empty value among several candidate keys. Actors rename fields
+// now and then (company / companyName / company_name), so every important
+// field lists its alternates instead of trusting one name.
+const pick = (obj, ...keys) => {
+    for (const key of keys) {
+        const value = obj?.[key];
+        if (value !== undefined && value !== null && value !== '') return value;
+    }
+    return null;
+};
+
+// Indeed actor -> the shared row shape (same keys the LinkedIn actor uses)
 const normalizeIndeedJob = (job) => ({
-    id: job.jobKey,
-    title: job.title,
-    link: job.url,
-    applyUrl: job.originalApplyUrl,
-    location: job.jobLocationShort || job.jobLocationFull,
-    postedAt: job.datePublishedClean,
-    descriptionText: job.description,
-    employmentType: job.jobType || null,
-    seniorityLevel: null,
+    id: pick(job, 'jobKey', 'jobkey', 'id'),
+    title: pick(job, 'title', 'jobTitle', 'job_title'),
+    link: pick(job, 'url', 'jobUrl', 'job_url', 'link'),
+    applyUrl: pick(job, 'originalApplyUrl', 'applyUrl', 'apply_url'),
+    location: pick(job, 'jobLocationShort', 'jobLocationFull', 'location', 'jobLocation'),
+    postedAt: pick(job, 'datePublishedClean', 'datePublished', 'postedAt', 'date_published'),
+    descriptionText: pick(job, 'description', 'descriptionText', 'jobDescription', 'job_description'),
+    employmentType: pick(job, 'jobType', 'employmentType', 'job_type'),
+    seniorityLevel: pick(job, 'seniorityLevel', 'seniority_level'),
     jobFunction: null,
-    salaryInfo: job.salaryFormatted,
-    companyName: job.company,
-    companyWebsite: job.companyWebsite,
-    companyDomain: job.companyDomain,
-    companyIndustry: job.companyIndustry || job.companyIndustryRaw,
-    companyEmployeesCount: job.companyEmployeeRange,
-    companyDescription: job.companyDescription || job.companyBriefDescription,
-    companyHeadquarters: job.companyAddressFull,
-    companyCeoName: job.companyCeoName,
-    companyRating: job.companyRating,
-    companyRevenue: job.companyRevenue,
+    salaryInfo: pick(job, 'salaryFormatted', 'salary', 'salaryInfo'),
+    salaryMinPerYear: pick(job, 'salaryMinPerYear'),
+    salaryMaxPerYear: pick(job, 'salaryMaxPerYear'),
+    companyName: pick(job, 'company', 'companyName', 'company_name'),
+    companyWebsite: pick(job, 'companyWebsite', 'company_website', 'website'),
+    companyDomain: pick(job, 'companyDomain', 'company_domain'),
+    companyIndustry: pick(job, 'companyIndustry', 'companyIndustryRaw', 'company_industry', 'industry'),
+    companyEmployeesCount: pick(job, 'companyEmployeeRange', 'companyEmployeesCount', 'companySize', 'company_size'),
+    companyDescription: pick(job, 'companyDescription', 'companyBriefDescription', 'company_description'),
+    companyHeadquarters: pick(job, 'companyAddressFull', 'companyHeadquarters', 'company_headquarters'),
+    companyCeoName: pick(job, 'companyCeoName'),
+    companyRating: pick(job, 'companyRating'),
+    companyRevenue: pick(job, 'companyRevenue'),
     companyLinkedinUrl: null,
+    companyProfileUrl: pick(job, 'companyIndeedUrl', 'companyUrl', 'company_url'),
     platform: PLATFORMS.INDEED,
 });
 
-const normalizeLinkedinJob = (job) => ({ ...job, platform: PLATFORMS.LINKEDIN });
+// LinkedIn actor already uses the shared names; fill the few that can vary.
+const normalizeLinkedinJob = (job) => ({
+    ...job,
+    title: pick(job, 'title', 'jobTitle'),
+    link: pick(job, 'link', 'url', 'jobUrl'),
+    companyName: pick(job, 'companyName', 'company', 'company_name'),
+    companyEmployeesCount: pick(job, 'companyEmployeesCount', 'companySize', 'companyEmployeeRange'),
+    postedAt: pick(job, 'postedAt', 'datePublished', 'postedDate'),
+    salaryMinPerYear: pick(job, 'salaryMinPerYear'),
+    salaryMaxPerYear: pick(job, 'salaryMaxPerYear'),
+    companyProfileUrl: pick(job, 'companyLinkedinUrl', 'companyUrl'),
+    platform: PLATFORMS.LINKEDIN,
+});
 
 export const normalizeJob = (job, platform, keyword) => ({
     ...(platform === PLATFORMS.INDEED ? normalizeIndeedJob(job) : normalizeLinkedinJob(job)),
@@ -166,6 +193,7 @@ export const groupByCompany = (jobs) => {
                 companyType: job.companyType,
                 companyFounded: job.companyFounded,
                 companyLinkedinUrl: job.companyLinkedinUrl,
+                companyProfileUrl: job.companyProfileUrl,
                 jobs: [],
             });
         }

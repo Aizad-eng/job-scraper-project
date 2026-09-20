@@ -18,12 +18,12 @@ export const AGENCY_MODE_OPTIONS = [
     {
         value: 'remove',
         label: 'Remove agencies',
-        hint: 'Word screen plus an AI check on each company. Recommended.',
+        hint: 'Word screen, then the website check on companies not already in memory. Recommended.',
     },
     {
         value: 'keywords',
         label: 'Word screen only',
-        hint: 'Free and instant. Drops companies with "staffing", "recruiting" and similar in the name, domain or industry.',
+        hint: 'Free and instant. Drops companies with "staffing", "recruiting" and similar in the name, domain or industry, plus anything already known as an agency.',
     },
     {
         value: 'flag',

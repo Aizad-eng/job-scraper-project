@@ -6,6 +6,7 @@ import { AGENCY_MODE, REMOVAL_REASON } from '../constants/filterConstants.js';
 import { DELIVERY_STATE } from '../constants/deliveryConstants.js';
 import { applyRuleFilters, applyPerCompanyCap } from '../services/filter.service.js';
 import { classifyCompanies } from '../services/classification.service.js';
+import { recordCompaniesSeen, getKnownVerdicts, saveVerdicts } from '../services/company.service.js';
 import { buildPayloads, deliverAll, payloadKey } from '../services/delivery.service.js';
 import { groupByCompany, companyKey, normalizeJob, stripJobFields, countByReason } from '../helpers/jobHelpers.js';
 
@@ -108,10 +109,20 @@ const runPipeline = async (job) => {
 
         console.log(`Job ${job.jobId}: ${job.scrapedJobs.length} scraped, ${kept.length} kept after rules`);
 
+        // ---- COMPANY MEMORY ----
+        // Every company we see is recorded, whatever the agency setting.
+        const seenCompanies = groupByCompany(kept);
+        try {
+            await recordCompaniesSeen(seenCompanies, { jobId: job.jobId, scheduleId: job.scheduleId || null });
+        } catch (error) {
+            console.error(`Job ${job.jobId}: could not record companies:`, error.message);
+        }
+
         // ---- CLASSIFYING ----
         const useAi = inputs.agencyMode === AGENCY_MODE.FLAG || inputs.agencyMode === AGENCY_MODE.REMOVE;
+        const useMemory = inputs.agencyMode !== AGENCY_MODE.OFF;
 
-        if (useAi && kept.length) {
+        if (useMemory && kept.length) {
             job.status = JOB_STATUS.CLASSIFYING;
             job.filteredJobs = kept;
             job.removedJobs = removed;
@@ -121,9 +132,24 @@ const runPipeline = async (job) => {
             job.markModified('removedByReason');
             await job.save();
 
-            const companies = groupByCompany(kept);
-            console.log(`Classifying ${companies.length} unique companies...`);
-            const verdicts = await classifyCompanies(companies);
+            // What do we already know? Overrides and fresh verdicts skip the paid check.
+            const verdicts = await getKnownVerdicts(seenCompanies.map((c) => c.key));
+            const toCheck = useAi ? seenCompanies.filter((c) => !verdicts.has(c.key)) : [];
+
+            console.log(
+                `Job ${job.jobId}: ${seenCompanies.length} companies, ${verdicts.size} known from memory, ` +
+                `${toCheck.length} to check`
+            );
+
+            if (toCheck.length) {
+                const fresh = await classifyCompanies(toCheck);
+                fresh.forEach((verdict, key) => verdicts.set(key, verdict));
+                try {
+                    await saveVerdicts(fresh);
+                } catch (error) {
+                    console.error(`Job ${job.jobId}: could not save verdicts:`, error.message);
+                }
+            }
 
             const next = [];
             kept.forEach((item) => {
@@ -138,11 +164,12 @@ const runPipeline = async (job) => {
                     aiSource: verdict?.source ?? null,
                 };
 
-                if (inputs.agencyMode === AGENCY_MODE.REMOVE && annotated.isStaffingAgency === true) {
+                const dropAgencies = inputs.agencyMode === AGENCY_MODE.REMOVE || inputs.agencyMode === AGENCY_MODE.KEYWORDS;
+                if (dropAgencies && annotated.isStaffingAgency === true) {
                     removed.push({
                         companyName: item.companyName,
                         title: item.title,
-                        reason: REMOVAL_REASON.AI_AGENCY,
+                        reason: verdict.cached ? REMOVAL_REASON.KNOWN_AGENCY : REMOVAL_REASON.AI_AGENCY,
                         detail: annotated.agencyReason,
                     });
                     return;
@@ -151,12 +178,12 @@ const runPipeline = async (job) => {
             });
             kept = next;
 
-            console.log(`After AI: ${kept.length} jobs kept`);
+            console.log(`After agency check: ${kept.length} jobs kept`);
         } else {
             kept = kept.map((item) => ({
                 ...item,
-                isStaffingAgency: inputs.agencyMode === AGENCY_MODE.KEYWORDS ? false : null,
-                agencyReason: inputs.agencyMode === AGENCY_MODE.KEYWORDS ? 'Passed the staffing-word screen' : null,
+                isStaffingAgency: null,
+                agencyReason: null,
             }));
         }
 

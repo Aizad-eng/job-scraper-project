@@ -3,6 +3,7 @@ import SearchForm from "./components/SearchForm.jsx";
 import RunProgress from "./components/RunProgress.jsx";
 import RecentRuns from "./components/RecentRuns.jsx";
 import Schedules from "./components/Schedules.jsx";
+import Companies from "./components/Companies.jsx";
 import {
   startScrape,
   fetchJobStatus,
@@ -54,6 +55,7 @@ export default function App() {
   const openJob = useCallback((id) => go({ jobId: id, view: "search" }), [go]);
   const openSearch = useCallback(() => go({ jobId: null, view: "search" }), [go]);
   const openSchedules = useCallback(() => go({ jobId: null, view: "schedules" }), [go]);
+  const openCompanies = useCallback(() => go({ jobId: null, view: "companies" }), [go]);
 
   // browser back / forward
   useEffect(() => {
@@ -200,6 +202,13 @@ export default function App() {
           >
             Schedules
           </button>
+          <button
+            type="button"
+            className={view === "companies" ? "is-on" : ""}
+            onClick={openCompanies}
+          >
+            Companies
+          </button>
         </nav>
       )}
 
@@ -214,6 +223,8 @@ export default function App() {
             onOpenSchedules={openSchedules}
           />
         </>
+      ) : view === "companies" ? (
+        <Companies />
       ) : view === "schedules" ? (
         <Schedules
           onOpenRun={openJob}

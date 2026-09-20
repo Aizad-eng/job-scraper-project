@@ -78,6 +78,7 @@ export const REMOVAL_REASON_LABELS = {
     employment_type: 'Employment type',
     per_company_cap: 'Over the per-company limit',
     already_sent: 'Already sent by this schedule',
+    known_agency: 'Known staffing agency (company memory)',
 };
 
 export const AGENCY_MODE_LABELS = {

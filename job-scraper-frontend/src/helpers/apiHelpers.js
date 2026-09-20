@@ -88,3 +88,22 @@ export const runScheduleNow = (scheduleId) =>
 
 export const resetScheduleSent = (scheduleId) =>
     request(`/schedules/${scheduleId}/reset-sent`, { method: 'POST' });
+
+// ---- company memory ---------------------------------------------------------
+
+export const listCompanies = ({ q = '', filter = 'all', page = 1 } = {}) => {
+    const params = new URLSearchParams();
+    if (q) params.set('q', q);
+    if (filter && filter !== 'all') params.set('filter', filter);
+    if (page > 1) params.set('page', String(page));
+    const query = params.toString();
+    return request(`/companies${query ? `?${query}` : ''}`);
+};
+
+export const fetchCompanyStats = () => request('/companies/stats');
+
+export const setCompanyOverride = (key, isStaffingAgency, note = '') =>
+    request(`/companies/${encodeURIComponent(key)}/override`, {
+        method: 'PATCH',
+        body: JSON.stringify({ isStaffingAgency, note }),
+    });

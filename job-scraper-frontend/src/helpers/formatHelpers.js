@@ -40,8 +40,10 @@ export const formatElapsed = (startIso, endIso) => {
 export const formatDate = (iso) => {
     if (!iso) return '';
     const date = new Date(iso);
+    const sameYear = date.getFullYear() === new Date().getFullYear();
     return date.toLocaleString(undefined, {
         month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit',
+        ...(sameYear ? {} : { year: 'numeric' }),
     });
 };
 

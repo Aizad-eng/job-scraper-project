@@ -64,6 +64,8 @@ A search can also be saved as a **schedule**: every day, every N days, or chosen
 
 These are only called when "Staffing agencies" is set to *Remove agencies* or *Keep but flag*. The *Word screen only* and *Off* settings never call them.
 
+**Company memory.** Every company that gets past the rule filters is recorded in a `companies` collection (one document per domain) with what the job board said about it, how often it has appeared, and the check result. Before spending a check, the pipeline looks the company up: a known staffing agency is skipped forever (reported as *Known staffing agency*), a direct-employer verdict is reused for 180 days, an Unknown is retried after 30 days. The **Companies** tab lists everything with search and filters, and lets you mark a company as agency or employer by hand; a hand-set value always wins and is never re-checked. *Word screen only* also uses memory (it is free), it just never calls the paid check.
+
 **How the company check decides.** For each unique company with a website: ScrapingDog asks Google AI Mode to visit the site and answer `is_recruitment_firm: Yes / No / Unknown` with an industry and a 2–3 sentence description. If the answer is clean JSON it is used as-is. If it comes back as prose or fenced text, Claude (`claude-opus-5`, structured output) converts it into the same record. `Yes` removes (or flags) the company, `No` keeps it, `Unknown` keeps it undecided. If ScrapingDog is not configured, errors (for example out of credits), or gives nothing usable, the old GPT / Perplexity classifiers run when their keys are set; otherwise the company is kept. Every row carries `aiIndustry`, `aiSummary` and `aiSource` from whichever check ran.
 
 ### Backend
@@ -162,6 +164,7 @@ One row per **job listing** (default):
   "seniorityLevel": "Mid-Senior level",
   "jobFunction": "Engineering",
   "salary": "$140,000/yr - $180,000/yr",
+  "salaryMinPerYear": null, "salaryMaxPerYear": null,
   "applicants": "25 applicants",
   "jobPosterName": "…", "jobPosterTitle": "…", "jobPosterProfileUrl": "…",
   "jobDescription": "…",
@@ -172,6 +175,7 @@ One row per **job listing** (default):
   "companyDomain": "example.com",
   "companyWebsite": "https://www.example.com/",
   "companyLinkedinUrl": "…",
+  "companyProfileUrl": "…",
   "companyIndustry": "Software Development",
   "companySize": "51-200 employees",
   "companyHeadquarters": "Austin, TX",
@@ -190,6 +194,8 @@ One row per **job listing** (default):
   "sentAt": "2026-09-20T10:32:21.117Z"
 }
 ```
+
+Rows from LinkedIn and Indeed have **exactly the same keys**. Each actor's own field names (`company` vs `companyName` vs `company_name`, `url` vs `link`, `companyEmployeeRange` vs `companyEmployeesCount`, and so on) are mapped to this one shape in `jobHelpers.js`, with alternates so a renamed key on either actor cannot silently blank a column. `platform` says which board the row came from and `searchKeyword` which title found it. `companyProfileUrl` is the LinkedIn company page or the Indeed company page. Fields a board does not provide (Indeed has no seniority level, LinkedIn has no annualised salary) are `null`.
 
 One row per **company** carries the same company fields plus `openRolesFound`, `firstJobTitle`, `firstJobUrl`, `firstJobLocation`, `firstJobPostedAt`, `allJobTitles` (pipe-separated) and a nested `jobs` array.
 
@@ -210,6 +216,7 @@ job-scraper-backend/
 │   ├── filterConstants.js          Size bands, staffing words, agency modes, removal reasons
 │   ├── aiConstants.js              Models, ScrapingDog / Claude prompts, batch sizes
 │   ├── deliveryConstants.js        Delivery modes, rate limit, retry policy
+│   ├── companyConstants.js         Verdict lifetimes, list filters
 │   └── scheduleConstants.js        Frequencies, tick interval, sent-listing retention
 ├── src/middleware/
 │   ├── auth.js                     Access-key gate and Apify webhook secret
@@ -217,14 +224,17 @@ job-scraper-backend/
 ├── src/models/
 │   ├── job.model.js                The Job document — inputs, results, delivery stats
 │   ├── schedule.model.js           A saved search with its timing and last-run info
+│   ├── company.model.js            Company memory: what we know, verdict, override, seen counts
 │   └── deliveredListing.model.js   What each schedule has already sent (TTL 120 days)
 ├── src/routes/
 │   ├── scrape.routes.js            POST /scrape, GET /job-status/:id, POST /test-webhook
 │   ├── schedule.routes.js          CRUD, run now, reset sent
+│   ├── company.routes.js           List / search companies, stats, set override
 │   └── webhook.routes.js           POST /apify-webhook
 ├── src/controllers/
 │   ├── scrape.controller.js        Starts a one-off search, reports status
 │   ├── schedule.controller.js      Schedule CRUD and actions
+│   ├── company.controller.js       Companies list, stats, override
 │   ├── webhook.controller.js       Apify callback + the whole pipeline
 │   └── testWebhook.controller.js   Sends one sample row to a webhook
 ├── src/services/
@@ -232,6 +242,7 @@ job-scraper-backend/
 │   ├── scheduler.service.js        30-second tick that starts due schedules
 │   ├── apify.service.js            Triggers actors, fetches results (paginated)
 │   ├── filter.service.js           Rule filters and per-company cap
+│   ├── company.service.js          Record companies seen, reuse known verdicts, save new ones
 │   ├── scrapingdog.service.js      Google AI Mode call + answer parsing
 │   ├── claude.service.js           Structured-output cleanup of loose answers
 │   ├── ai.service.js               GPT and Perplexity fallbacks
@@ -248,6 +259,7 @@ job-scraper-frontend/src/
 │   ├── SearchForm.jsx              The five-step form (also edits schedules)
 │   ├── ScheduleFields.jsx          Step 5: frequency, days, time, skip-sent
 │   ├── Schedules.jsx               Schedules tab: list, run now, pause, edit, delete
+│   ├── Companies.jsx               Companies tab: search, filter, mark agency / employer
 │   ├── RunProgress.jsx             Stages, totals, removal reasons, settings, rerun
 │   ├── RecentRuns.jsx              Last runs from this browser
 │   ├── ChipGroup.jsx               Multi-select toggle buttons
