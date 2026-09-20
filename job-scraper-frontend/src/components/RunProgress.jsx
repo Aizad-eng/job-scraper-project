@@ -11,6 +11,7 @@ import { COMPANY_SIZE_BANDS } from "../constants/searchConstants.js";
 import {
   getStageState,
   formatElapsed,
+  formatUntil,
   visibleStages,
 } from "../helpers/formatHelpers.js";
 
@@ -120,9 +121,12 @@ export default function RunProgress({ jobId, status, onReset, onRerun, onOpenSch
                   {stage.label}
                   {stage.status === JOB_STATUS.SCRAPING &&
                     state === STAGE_STATE.ACTIVE &&
-                    status.totalRuns > 1 && (
+                    (status.totalRuns > 1 || status.pendingRuns > 0) && (
                       <em className="stage-sub">
-                        {status.completedRuns} of {status.totalRuns} scrapes finished
+                        {status.completedRuns} of {status.totalRuns + (status.pendingRuns || 0)} scrapes finished
+                        {status.pendingRuns > 0 && status.nextLaunchAt && (
+                          <> · {status.pendingRuns} queued, next starts {formatUntil(status.nextLaunchAt)}</>
+                        )}
                       </em>
                     )}
                 </span>
@@ -311,6 +315,12 @@ export default function RunProgress({ jobId, status, onReset, onRerun, onOpenSch
                   {status.inputs.salaryMax != null ? status.inputs.salaryMax.toLocaleString() : "any"}
                   <em>{status.inputs.includeNoSalary === false ? " · unknown dropped" : " · unknown kept"}</em>
                 </dd>
+              </div>
+            )}
+            {status.inputs.launchSpacingMinutes > 0 && (
+              <div>
+                <dt>Keyword spacing</dt>
+                <dd>{status.inputs.launchSpacingMinutes} min apart</dd>
               </div>
             )}
             <div>

@@ -56,6 +56,7 @@ export const parseInputs = (body = {}) => {
         salaryMin: body.salaryMin === '' || body.salaryMin === null || body.salaryMin === undefined ? null : Math.max(0, Number(body.salaryMin) || 0),
         salaryMax: body.salaryMax === '' || body.salaryMax === null || body.salaryMax === undefined ? null : Math.max(0, Number(body.salaryMax) || 0),
         includeNoSalary: body.includeNoSalary !== false,
+        launchSpacingMinutes: Math.min(Math.max(Number(body.launchSpacingMinutes) || 0, 0), 24 * 60),
         cooldownDays: Math.min(
             Math.max(body.cooldownDays === undefined || body.cooldownDays === null || body.cooldownDays === '' ? DEFAULT_COOLDOWN_DAYS : Number(body.cooldownDays) || 0, 0),
             MAX_COOLDOWN_DAYS
@@ -72,49 +73,88 @@ export const parseInputs = (body = {}) => {
     return inputs;
 };
 
-// Creates the Job and starts one Apify run per keyword × platform.
+const MINUTE_MS = 60 * 1000;
+
+// Starts the Apify runs for one keyword on every platform. Returns the run
+// entries; a failed trigger becomes a FAILED entry instead of throwing, so
+// one bad launch never strands the job.
+export const launchKeyword = async (inputs, keyword, callbackUrl) => {
+    const entries = [];
+    for (const platform of inputs.platforms) {
+        try {
+            const runId = await triggerActorRun(
+                platform,
+                {
+                    keyword,
+                    location: inputs.location,
+                    jobsPerKeyword: inputs.jobsPerKeyword,
+                    postedWithin: inputs.postedWithin,
+                    maxJobsPerCompany: inputs.maxJobsPerCompany,
+                },
+                callbackUrl
+            );
+            entries.push({ runId, platform, keyword, status: 'RUNNING' });
+        } catch (error) {
+            const message = error.response?.data?.error?.message || error.message;
+            console.error(`Could not start ${platform} search for "${keyword}":`, message);
+            entries.push({ runId: null, platform, keyword, status: 'FAILED', error: message });
+        }
+    }
+    return entries;
+};
+
+export const callbackUrl = () =>
+    `${process.env.PUBLIC_BASE_URL}/api/apify-webhook?s=${process.env.WEBHOOK_SECRET}`;
+
+/**
+ * Creates the Job and starts the searches. With launchSpacingMinutes > 0 the
+ * first keyword starts now and the rest are queued on the job; the
+ * scheduler tick launches them when their time comes.
+ */
 export const launchSearch = async (inputs, { scheduleId = null, skipAlreadySent = false } = {}) => {
     const jobId = randomUUID();
+    const spacing = Number(inputs.launchSpacingMinutes) || 0;
+    const [first, ...rest] = inputs.keywords;
+    const now = Date.now();
+
+    const pendingLaunches = spacing > 0
+        ? rest.flatMap((keyword, i) =>
+            inputs.platforms.map((platform) => ({
+                keyword,
+                platform,
+                launchAt: new Date(now + (i + 1) * spacing * MINUTE_MS),
+            }))
+        )
+        : [];
+
     const job = await Job.create({
         jobId,
         status: JOB_STATUS.SCRAPING,
         inputs,
         scheduleId,
         skipAlreadySent,
+        pendingLaunches,
     });
 
-    const callbackUrl = `${process.env.PUBLIC_BASE_URL}/api/apify-webhook?s=${process.env.WEBHOOK_SECRET}`;
+    const url = callbackUrl();
     const apifyRuns = [];
+    const toLaunchNow = spacing > 0 ? [first] : inputs.keywords;
 
-    try {
-        for (const keyword of inputs.keywords) {
-            for (const platform of inputs.platforms) {
-                const runId = await triggerActorRun(
-                    platform,
-                    {
-                        keyword,
-                        location: inputs.location,
-                        jobsPerKeyword: inputs.jobsPerKeyword,
-                        postedWithin: inputs.postedWithin,
-                        maxJobsPerCompany: inputs.maxJobsPerCompany,
-                    },
-                    callbackUrl
-                );
-                apifyRuns.push({ runId, platform, keyword, status: 'RUNNING' });
-            }
-        }
-    } catch (error) {
-        // Don't leave a half-started job hanging in "scraping" forever.
-        const message = error.response?.data?.error?.message || error.message;
-        job.apifyRuns = apifyRuns;
+    for (const keyword of toLaunchNow) {
+        apifyRuns.push(...(await launchKeyword(inputs, keyword, url)));
+    }
+
+    job.apifyRuns = apifyRuns;
+
+    const nothingStarted = apifyRuns.every((run) => run.status === 'FAILED') && !pendingLaunches.length;
+    if (nothingStarted) {
+        const message = apifyRuns[0]?.error || 'No search could be started';
         job.status = JOB_STATUS.FAILED;
         job.error = `Could not start the scrape: ${message}`;
         await job.save();
         throw new Error(message);
     }
 
-    job.apifyRuns = apifyRuns;
     await job.save();
-
     return job;
 };

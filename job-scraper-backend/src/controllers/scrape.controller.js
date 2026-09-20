@@ -39,6 +39,10 @@ export const getJobStatus = async (req, res) => {
             isEmpty: job.status === JOB_STATUS.EMPTY,
             totalRuns: job.apifyRuns?.length || 0,
             completedRuns: (job.apifyRuns || []).filter((r) => r.status !== 'RUNNING').length,
+            pendingRuns: job.pendingLaunches?.length || 0,
+            nextLaunchAt: job.pendingLaunches?.length
+                ? job.pendingLaunches.reduce((min, p) => (p.launchAt < min ? p.launchAt : min), job.pendingLaunches[0].launchAt)
+                : null,
             scrapedCount: job.scrapedJobs?.length || 0,
             keptCount: job.filteredJobs?.length || 0,
             removedCount: job.removedJobs?.length || 0,

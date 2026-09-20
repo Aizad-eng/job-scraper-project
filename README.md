@@ -156,6 +156,8 @@ The progress page shows each stage with counts, why listings were removed, the s
 
 The **Schedules** tab lists every saved schedule with its next run, last run, and past runs. From there you can **Run now**, **Pause** / **Resume**, **Edit** (same form, pre-filled), **Delete**, or **Forget sent listings** so the next run sends everything again.
 
+**Keyword spacing.** A schedule can space its keyword searches out: *Minutes between keyword searches* (default 20 for schedules, 0 for one-off runs). The first keyword starts at the scheduled time on every board; each next keyword starts that many minutes later. The queued searches live on the job (`pendingLaunches`) and the same 30-second tick launches them when due, so a restart in between loses nothing. Filtering and delivery happen once, after the last search has finished. The run page shows how many are queued and when the next starts.
+
 How it runs: the backend checks every 30 seconds for schedules whose next run time has passed and starts them one at a time. If the server was down at the scheduled time, the run starts as soon as it is back. Each schedule remembers the job URLs (or company domains, in company mode) it has delivered for 120 days; a scheduled run drops those before sending and reports them as *Already sent by this schedule*.
 
 Render's free tier sleeps idle services, which would stall the scheduler. Use a paid instance type (the `starter` plan in `render.yaml`) or an external ping to keep it awake.

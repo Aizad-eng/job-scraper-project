@@ -79,6 +79,7 @@ export const DEFAULT_FORM_VALUES = {
     salaryMin: '',
     salaryMax: '',
     includeNoSalary: true,
+    launchSpacingMinutes: 0,
 };
 
 export const JOBS_PER_KEYWORD_OPTIONS = [10, 25, 50, 100, 250, 500];
@@ -98,6 +99,7 @@ export const FIELD_HINTS = {
     maxJobsPerCompany: 'Stops one big employer flooding the results. 0 means no limit.',
     webhookUrl: 'Every row is POSTed here as JSON. Works with Clay, Zapier, Make, n8n or your own endpoint.',
     postedWithin: 'Recent postings are a stronger hiring signal and cost less to process.',
+    launchSpacingMinutes: 'The first keyword starts at the scheduled time; each next keyword starts this many minutes later, on every board. Results are processed once, after the last one finishes. 0 launches everything at once.',
     salary: 'Yearly figures. Pay stated per hour, week or month is converted to a year. Leave both empty for any salary.',
     includeNoSalary: 'Many listings state no pay at all. Untick to drop them.',
     extractSalaries: 'When the board gives no usable figure, Claude reads the description and pulls out any stated pay. A fraction of a cent per listing.',

@@ -44,6 +44,8 @@ const jobSchema = new mongoose.Schema(
             salaryMin: { type: Number, default: null },
             salaryMax: { type: Number, default: null },
             includeNoSalary: { type: Boolean, default: true },
+            // minutes between keyword searches (0 = launch everything at once)
+            launchSpacingMinutes: { type: Number, default: 0 },
         },
         apifyRuns: [
             {
@@ -51,6 +53,14 @@ const jobSchema = new mongoose.Schema(
                 platform: String,
                 keyword: String,
                 status: String,
+            },
+        ],
+        // keyword × platform searches not launched yet (spaced launches)
+        pendingLaunches: [
+            {
+                keyword: String,
+                platform: String,
+                launchAt: Date,
             },
         ],
         scrapedJobs: { type: Array, default: [] },

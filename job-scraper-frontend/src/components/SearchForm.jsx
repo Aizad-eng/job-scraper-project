@@ -2,7 +2,7 @@ import { useState } from "react";
 import TagInput from "./TagInput.jsx";
 import ChipGroup from "./ChipGroup.jsx";
 import ScheduleFields from "./ScheduleFields.jsx";
-import { REPEAT_OPTIONS, DEFAULT_SCHEDULE_FIELDS } from "../constants/scheduleConstants.js";
+import { REPEAT_OPTIONS, DEFAULT_SCHEDULE_FIELDS, DEFAULT_LAUNCH_SPACING_MINUTES } from "../constants/scheduleConstants.js";
 import {
   PLATFORMS,
   DEFAULT_FORM_VALUES,
@@ -562,7 +562,13 @@ export default function SearchForm({
                     name="repeat"
                     value={option.value}
                     checked={repeat === option.value}
-                    onChange={() => setRepeat(option.value)}
+                    onChange={() => {
+                      setRepeat(option.value);
+                      if (option.value === "schedule" && !values.launchSpacingMinutes) {
+                        setField("launchSpacingMinutes", DEFAULT_LAUNCH_SPACING_MINUTES);
+                      }
+                      if (option.value === "once") setField("launchSpacingMinutes", 0);
+                    }}
                   />
                   <span>
                     <strong>{option.label}</strong>
@@ -575,7 +581,34 @@ export default function SearchForm({
         )}
 
         {isSchedule && (
-          <ScheduleFields fields={schedule} onChange={setSchedule} errors={errors} />
+          <>
+            <ScheduleFields fields={schedule} onChange={setSchedule} errors={errors} />
+            <div className="field narrow">
+              <label className="field-label" htmlFor="launchSpacingMinutes">
+                Minutes between keyword searches
+              </label>
+              <div className="input-with-suffix">
+                <input
+                  id="launchSpacingMinutes"
+                  type="number"
+                  min="0"
+                  max="1440"
+                  className="text-input"
+                  value={values.launchSpacingMinutes}
+                  onChange={(event) =>
+                    setField("launchSpacingMinutes", Math.max(0, Number(event.target.value) || 0))
+                  }
+                />
+                <span>min</span>
+              </div>
+              <p className="field-hint below">
+                {FIELD_HINTS.launchSpacingMinutes}
+                {values.keywords.length > 1 && values.launchSpacingMinutes > 0 && (
+                  <> Last keyword starts {(values.keywords.length - 1) * values.launchSpacingMinutes} min after the first.</>
+                )}
+              </p>
+            </div>
+          </>
         )}
       </section>
 

@@ -68,31 +68,40 @@ export const handleApifyWebhook = async (req, res) => {
             );
         }
 
-        // re-read to see the latest state after that write
-        const refreshed = await Job.findOne({ jobId: job.jobId });
-
-        const allDone = refreshed.apifyRuns.every((run) =>
-            APIFY_TERMINAL_STATUSES.includes(String(run.status).toUpperCase())
-        );
-
-        if (!allDone) return;
-
-        // only one webhook may claim the pipeline
-        const claimed = await Job.findOneAndUpdate(
-            { jobId: refreshed.jobId, status: JOB_STATUS.SCRAPING },
-            { $set: { status: JOB_STATUS.FILTERING } },
-            { returnDocument: 'after' }
-        );
-
-        if (!claimed) {
-            console.log(`Job ${refreshed.jobId}: pipeline already running elsewhere, skipping`);
-            return;
-        }
-
-        await runPipeline(claimed);
+        await finishJobIfComplete(job.jobId);
     } catch (error) {
         console.error('Webhook processing error:', error.message);
     }
+};
+
+/**
+ * Runs the pipeline when every search of the job has ended and nothing is
+ * still queued to launch. Safe to call from anywhere; only one caller wins.
+ */
+export const finishJobIfComplete = async (jobId) => {
+    const job = await Job.findOne({ jobId });
+    if (!job || job.status !== JOB_STATUS.SCRAPING) return false;
+
+    if (job.pendingLaunches?.length) return false;
+
+    const allDone = job.apifyRuns.every((run) =>
+        APIFY_TERMINAL_STATUSES.includes(String(run.status).toUpperCase())
+    );
+    if (!allDone) return false;
+
+    // only one caller may claim the pipeline
+    const claimed = await Job.findOneAndUpdate(
+        { jobId, status: JOB_STATUS.SCRAPING },
+        { $set: { status: JOB_STATUS.FILTERING } },
+        { returnDocument: 'after' }
+    );
+    if (!claimed) {
+        console.log(`Job ${jobId}: pipeline already running elsewhere, skipping`);
+        return false;
+    }
+
+    await runPipeline(claimed);
+    return true;
 };
 
 const finishEmpty = async (job, reason) => {

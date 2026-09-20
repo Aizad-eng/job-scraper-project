@@ -38,3 +38,6 @@ export const DEFAULT_SCHEDULE_FIELDS = {
 };
 
 export const SCHEDULES_REFRESH_MS = 20000;
+
+// default gap between keyword searches for a schedule
+export const DEFAULT_LAUNCH_SPACING_MINUTES = 20;
