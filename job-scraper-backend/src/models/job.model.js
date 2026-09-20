@@ -43,6 +43,7 @@ const jobSchema = new mongoose.Schema(
             cooldownDays: { type: Number, default: 21 },
             findMissingDomains: { type: Boolean, default: true },
             extractSalaries: { type: Boolean, default: true },
+            cleanTitles: { type: Boolean, default: true },
             salaryMin: { type: Number, default: null },
             salaryMax: { type: Number, default: null },
             includeNoSalary: { type: Boolean, default: true },

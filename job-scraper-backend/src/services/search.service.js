@@ -55,6 +55,7 @@ export const parseInputs = (body = {}) => {
         deliveryMode: oneOf(body.deliveryMode, Object.values(DELIVERY_MODE), DEFAULT_DELIVERY_MODE),
         findMissingDomains: body.findMissingDomains !== false,
         extractSalaries: body.extractSalaries !== false,
+        cleanTitles: body.cleanTitles !== false,
         salaryMin: body.salaryMin === '' || body.salaryMin === null || body.salaryMin === undefined ? null : Math.max(0, Number(body.salaryMin) || 0),
         salaryMax: body.salaryMax === '' || body.salaryMax === null || body.salaryMax === undefined ? null : Math.max(0, Number(body.salaryMax) || 0),
         includeNoSalary: body.includeNoSalary !== false,

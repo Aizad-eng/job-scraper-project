@@ -18,6 +18,8 @@ import { groupByCompany, daysSincePosted } from '../helpers/jobHelpers.js';
 
 const jobFields = (job) => ({
     jobTitle: job.title ?? null,
+    // the role as you would write it in an email: no location, id, remote tag
+    jobTitleClean: job.jobTitleClean ?? null,
     jobUrl: job.link ?? null,
     applyUrl: job.applyUrl ?? null,
     jobLocation: job.location ?? null,
@@ -75,6 +77,7 @@ const buildCompanyPayload = (company, meta) => {
         ...companyFields({ ...company, ...first }),
         openRolesFound: company.jobs.length,
         firstJobTitle: first.title ?? null,
+        firstJobTitleClean: first.jobTitleClean ?? null,
         firstJobUrl: first.link ?? null,
         firstJobLocation: first.location ?? null,
         firstJobPostedAt: first.postedAt ?? null,
@@ -84,8 +87,10 @@ const buildCompanyPayload = (company, meta) => {
             .filter((d) => d !== null)
             .reduce((min, d) => (min === null || d < min ? d : min), null),
         allJobTitles: company.jobs.map((job) => job.title).filter(Boolean).join(' | '),
+        allJobTitlesClean: [...new Set(company.jobs.map((job) => job.jobTitleClean).filter(Boolean))].join(' | '),
         jobs: company.jobs.map((job) => ({
             title: job.title ?? null,
+            titleClean: job.jobTitleClean ?? null,
             url: job.link ?? null,
             location: job.location ?? null,
             postedAt: job.postedAt ?? null,
@@ -120,6 +125,7 @@ export const payloadKey = (payload, mode) =>
 export const buildSamplePayload = (mode, meta = {}) => {
     const sampleJob = {
         title: 'Senior Software Engineer',
+        jobTitleClean: 'Senior Software Engineer',
         link: 'https://www.linkedin.com/jobs/view/0000000000',
         applyUrl: 'https://example.com/careers/123',
         location: 'Austin, Texas, United States',

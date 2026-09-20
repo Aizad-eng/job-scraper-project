@@ -18,6 +18,7 @@ import { buildPayloads, deliverAll, payloadKey } from '../services/delivery.serv
 import { groupByCompany, companyKey, normalizeJob, stripJobFields, countByReason, dedupeListings } from '../helpers/jobHelpers.js';
 import { resolveCompanyDomains } from '../services/domainLookup.service.js';
 import { resolveSalaries, applySalaryFilter } from '../services/salary.service.js';
+import { resolveTitles } from '../services/title.service.js';
 
 const EVENT_TO_STATUS = {
     'ACTOR.RUN.SUCCEEDED': 'SUCCEEDED',
@@ -160,6 +161,14 @@ const runPipeline = async (job) => {
             console.log(`Job ${job.jobId}: salaries — ${JSON.stringify(salaryStats)}`);
         } catch (error) {
             console.error(`Job ${job.jobId}: salary extraction failed:`, error.message);
+        }
+
+        // ---- CLEAN TITLES ----
+        try {
+            const titleStats = await resolveTitles(kept, { useClaude: inputs.cleanTitles !== false });
+            console.log(`Job ${job.jobId}: titles — ${JSON.stringify(titleStats)}`);
+        } catch (error) {
+            console.error(`Job ${job.jobId}: title cleaning failed:`, error.message);
         }
 
         const salaryFiltered = applySalaryFilter(kept, {

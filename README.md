@@ -70,6 +70,8 @@ These are only called when "Staffing agencies" is set to *Remove agencies* or *K
 
 **Domains.** Everything downstream (memory, cooldown, dedupe) keys on the company's registrable domain, normalised. A value from the job board that is a link shortener, social page, job board, ATS, email provider, or that does not resemble the company name is thrown away and counted as missing. With *Find missing company domains* on (default), each company without a usable domain is searched once on Google through ScrapingDog (5 credits) for its official website; the first result that passes the same checks is used, and the answer (found or not) is remembered by company name, so it is never paid for twice. Rows carry `companyDomainSource`: `board`, `found`, `memory`, or `none`. The run page shows how many domains came from where.
 
+**Clean titles.** `jobTitleClean` is the role as you would write it in an email: "Director of Sales - Memphis" → "Director of Sales", "Sr. Director, Product (Remote)" → "Senior Director, Product". Rules strip location, req IDs, brackets, remote/hybrid tags, salary and urgency words and expand Sr / Mgr / Dir; Claude Haiku 4.5 polishes only titles the rules were unsure about, and every raw title is remembered for a year so it is cleaned once. Company rows get `firstJobTitleClean` and `allJobTitlesClean`. *Clean job titles for emails* (More filters) turns the model step off.
+
 **Salaries.** Every kept listing gets `salaryMinPerYear`, `salaryMaxPerYear`, `salaryCurrency` and `salarySource`. Cheapest source first: Indeed's annualised numbers (`board`), then a deterministic parse of the board's salary text such as "$70,000 - $90,000 per year" or "€18.50 per hour" (`parsed`, converted to a year: hour × 2080, day × 260, week × 52, month × 12), and only then Claude Haiku 4.5 reading the board text or the description (`claude-text` / `claude-description`), returning nothing when no pay is stated. Extraction runs after the cheap filters, so it is never paid for rows that would be dropped anyway. The **Salary per year** filter keeps listings whose range overlaps yours; *Keep listings that state no salary* decides what happens to the rest. *Extract salaries from descriptions with Claude* (More filters) turns the model step off.
 
 **Cooldown.** After delivery, each sent company gets `lastSentAt` on its memory record. Before delivery, any company sent within the search's cooldown window is dropped and reported as *Company sent recently (cooldown)*. This works across one-off runs and all schedules, in both row modes.
@@ -171,6 +173,7 @@ One row per **job listing** (default):
 ```json
 {
   "jobTitle": "Senior Software Engineer",
+  "jobTitleClean": "Senior Software Engineer",
   "jobUrl": "https://www.linkedin.com/jobs/view/…",
   "applyUrl": "…",
   "jobLocation": "Austin, Texas, United States",

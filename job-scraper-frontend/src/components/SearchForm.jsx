@@ -472,6 +472,16 @@ export default function SearchForm({
             <label className="check">
               <input
                 type="checkbox"
+                checked={values.cleanTitles}
+                onChange={(event) => setField("cleanTitles", event.target.checked)}
+              />
+              <span>Clean job titles for emails</span>
+              <em>{FIELD_HINTS.cleanTitles}</em>
+            </label>
+
+            <label className="check">
+              <input
+                type="checkbox"
                 checked={values.extractSalaries}
                 onChange={(event) => setField("extractSalaries", event.target.checked)}
               />
