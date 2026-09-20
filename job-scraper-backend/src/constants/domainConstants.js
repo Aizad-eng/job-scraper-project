@@ -9,6 +9,7 @@ export const DOMAIN_LOOKUP_RESULTS = 10;
 export const DOMAIN_SOURCE = {
     BOARD: 'board',        // came from the job board as-is
     FOUND: 'found',        // looked up via Google (ScrapingDog)
+    BOARD_UNVERIFIED: 'board-unverified', // board gave a domain that does not resemble the name and Google found nothing better
     MEMORY: 'memory',      // a lookup we did earlier
     NONE: 'none',          // nothing usable
 };
@@ -39,6 +40,12 @@ export const BAD_DOMAINS = [
     'sites.google.com', 'docs.google.com', 'forms.gle', 'notion.site', 'notion.so', 'calendly.com',
     'mailchimp.com', 'eventbrite.com', 'meetup.com', 'yelp.com', 'bbb.org', 'crunchbase.com',
     'zoominfo.com', 'dnb.com', 'manta.com', 'mapquest.com', 'maps.app.goo.gl',
+    // SSO / login hosts, directories, data vendors, news
+    'okta.com', 'okta-emea.com', 'onelogin.com', 'auth0.com', 'microsoftonline.com', 'sharepoint.com', 'hr.com',
+    'bloomberg.com', 'reuters.com', 'sec.gov', 'trustpilot.com', 'g2.com', 'capterra.com', 'owler.com',
+    'rocketreach.co', 'signalhire.com', 'apollo.io', 'craft.co', 'pitchbook.com', 'cbinsights.com', 'comparably.com',
+    'builtin.com', 'theorg.com', 'opencorporates.com', 'buzzfile.com', 'kununu.com', 'ambitionbox.com',
+    'prnewswire.com', 'businesswire.com', 'globenewswire.com', 'forbes.com', 'inc.com', 'fortune.com',
     'example.com', 'localhost',
 ];
 

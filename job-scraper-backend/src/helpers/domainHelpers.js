@@ -59,6 +59,29 @@ export const domainMatchesName = (domain, name) => {
     return tokens.some((t) => t.length >= 6 && label.includes(t.slice(0, 5)));
 };
 
+// Does a search-result title name this company? Every real word of the
+// company name must appear in the title ("Advantage Solutions | Global
+// Marketing and Retail" for "Advantage Solutions").
+const LEGAL_WORDS = ['inc', 'llc', 'ltd', 'corp', 'corporation', 'co', 'plc', 'gmbh', 'the', 'of', 'and', 'group', 'holdings'];
+const cleanWords = (text) =>
+    String(text || '').toLowerCase().replace(/&/g, ' and ').replace(/[^a-z0-9]+/g, ' ').split(' ').filter(Boolean);
+
+export const titleMatchesName = (title, name) => {
+    const haystack = ` ${cleanWords(title).join(' ')} `;
+    const words = cleanWords(name).filter((w) => w.length >= 2 && !LEGAL_WORDS.includes(w));
+    if (!words.length) return false;
+    return words.every((w) => haystack.includes(` ${w} `));
+};
+
+// The title begins with the company name ("Advantage Solutions | Global…"),
+// which is how a company's own homepage is usually titled.
+export const titleStartsWithName = (title, name) => {
+    const titleWords = cleanWords(title);
+    const nameWords = cleanWords(name).filter((w) => !LEGAL_WORDS.includes(w));
+    if (!nameWords.length || titleWords.length < nameWords.length) return false;
+    return nameWords.every((w, i) => titleWords[i] === w);
+};
+
 // key used to remember domain lookups for a company name
 export const nameKey = (name) => String(name || '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
 

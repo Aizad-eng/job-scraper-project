@@ -12,6 +12,7 @@ import {
     cleanBoardDomain,
     isBadDomain,
     domainMatchesName,
+    titleStartsWithName,
     registrableDomain,
     nameKey,
 } from '../helpers/domainHelpers.js';
@@ -39,13 +40,23 @@ export const findDomainViaGoogle = async (companyName, { location = '', request 
     const organic = Array.isArray(response.data?.organic_results) ? response.data.organic_results : [];
     const candidates = organic.map((r) => normalizeDomain(r.link)).filter(Boolean);
 
-    for (let i = 0; i < organic.length; i += 1) {
-        const link = organic[i].link;
-        const domain = normalizeDomain(link);
-        if (!domain || isBadDomain(domain)) continue;
-        if (!domainMatchesName(domain, companyName)) continue;
-        const root = registrableDomain(domain);
-        return { domain: root, website: `https://${root}`, candidates };
+    const usable = organic
+        .map((r, rank) => ({ rank, title: r.title || '', domain: normalizeDomain(r.link) }))
+        .filter((r) => r.domain && !isBadDomain(r.domain));
+
+    // 1. a domain that resembles the name, at any rank
+    const byDomain = usable.find((r) => domainMatchesName(r.domain, companyName));
+    if (byDomain) {
+        const root = registrableDomain(byDomain.domain);
+        return { domain: root, website: `https://${root}`, candidates, matchedBy: 'domain' };
+    }
+
+    // 2. brand domains (youradv.com for "Advantage Solutions"): a top-3 result
+    //    whose title starts with the company name, as a homepage is titled
+    const byTitle = usable.find((r) => r.rank < 3 && titleStartsWithName(r.title, companyName));
+    if (byTitle) {
+        const root = registrableDomain(byTitle.domain);
+        return { domain: root, website: `https://${root}`, candidates, matchedBy: 'title' };
     }
 
     return { domain: null, website: null, candidates };
@@ -75,8 +86,9 @@ export const resolveCompanyDomains = async (jobs, { lookup = true, deps = {} } =
             stats.fromBoard += 1;
             return;
         }
+        const rejected = normalizeDomain(job.companyDomain || job.companyWebsite) || null;
         if (reason && reason !== 'missing') {
-            job.companyDomainRejected = job.companyDomain || job.companyWebsite || null;
+            job.companyDomainRejected = rejected;
             stats.cleaned += 1;
         }
         job.companyDomain = null;
@@ -85,8 +97,13 @@ export const resolveCompanyDomains = async (jobs, { lookup = true, deps = {} } =
 
         const key = nameKey(job.companyName);
         if (!key) return;
-        if (!needLookup.has(key)) needLookup.set(key, { name: job.companyName, jobs: [] });
-        needLookup.get(key).jobs.push(job);
+        if (!needLookup.has(key)) needLookup.set(key, { name: job.companyName, jobs: [], fallback: null });
+        const entry = needLookup.get(key);
+        entry.jobs.push(job);
+        // a board domain that merely failed the name check is better than nothing
+        if (reason === 'name_mismatch' && rejected && !isBadDomain(rejected) && !entry.fallback) {
+            entry.fallback = registrableDomain(rejected);
+        }
     });
 
     if (!needLookup.size) return stats;
@@ -103,6 +120,13 @@ export const resolveCompanyDomains = async (jobs, { lookup = true, deps = {} } =
         });
     };
 
+    const useFallback = (entry) => {
+        if (!entry.fallback) return false;
+        apply(entry, entry.fallback, `https://${entry.fallback}`, DOMAIN_SOURCE.BOARD_UNVERIFIED);
+        stats.boardUnverified = (stats.boardUnverified || 0) + 1;
+        return true;
+    };
+
     const canSearch = lookup && (hasScrapingDog() || deps.request);
     const toSearch = [];
 
@@ -112,12 +136,13 @@ export const resolveCompanyDomains = async (jobs, { lookup = true, deps = {} } =
             if (row.domain) {
                 apply(entry, row.domain, row.website, DOMAIN_SOURCE.MEMORY);
                 stats.fromMemory += 1;
-            } else {
+            } else if (!useFallback(entry)) {
                 stats.notFound += 1;
             }
             continue;
         }
         if (canSearch) toSearch.push([key, entry]);
+        else useFallback(entry);
     }
 
     // parallel, but the shared ScrapingDog limiter keeps it at 5 in flight
@@ -142,11 +167,12 @@ export const resolveCompanyDomains = async (jobs, { lookup = true, deps = {} } =
             if (result.domain) {
                 apply(entry, result.domain, result.website, DOMAIN_SOURCE.FOUND);
                 stats.found += 1;
-            } else {
+            } else if (!useFallback(entry)) {
                 stats.notFound += 1;
             }
         } catch (error) {
             console.error(`Domain lookup failed for ${entry.name}:`, error.response?.status || error.message);
+            useFallback(entry);
         }
     }));
 
