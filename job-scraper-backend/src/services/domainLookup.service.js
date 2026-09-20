@@ -1,6 +1,6 @@
 import axios from 'axios';
 import DomainLookup from '../models/domainLookup.model.js';
-import { hasScrapingDog } from './scrapingdog.service.js';
+import { hasScrapingDog, scrapingDogGet } from './scrapingdog.service.js';
 import {
     SCRAPINGDOG_GOOGLE_URL,
     DOMAIN_LOOKUP_TIMEOUT_MS,
@@ -26,7 +26,7 @@ const DAY_MS = 24 * 60 * 60 * 1000;
  */
 export const findDomainViaGoogle = async (companyName, { location = '', request = axios.get } = {}) => {
     const query = `${companyName}${location ? ` ${location}` : ''} official website`;
-    const response = await request(SCRAPINGDOG_GOOGLE_URL, {
+    const response = await scrapingDogGet(SCRAPINGDOG_GOOGLE_URL, {
         params: {
             api_key: process.env.SCRAPPINGDOG_KEY,
             query,
@@ -34,7 +34,7 @@ export const findDomainViaGoogle = async (companyName, { location = '', request 
             country: 'us',
         },
         timeout: DOMAIN_LOOKUP_TIMEOUT_MS,
-    });
+    }, request, `Google ${companyName}`);
 
     const organic = Array.isArray(response.data?.organic_results) ? response.data.organic_results : [];
     const candidates = organic.map((r) => normalizeDomain(r.link)).filter(Boolean);
@@ -104,6 +104,7 @@ export const resolveCompanyDomains = async (jobs, { lookup = true, deps = {} } =
     };
 
     const canSearch = lookup && (hasScrapingDog() || deps.request);
+    const toSearch = [];
 
     for (const [key, entry] of needLookup) {
         const row = known.get(key);
@@ -116,9 +117,11 @@ export const resolveCompanyDomains = async (jobs, { lookup = true, deps = {} } =
             }
             continue;
         }
+        if (canSearch) toSearch.push([key, entry]);
+    }
 
-        if (!canSearch) continue;
-
+    // parallel, but the shared ScrapingDog limiter keeps it at 5 in flight
+    await Promise.all(toSearch.map(async ([key, entry]) => {
         try {
             stats.searched += 1;
             const result = await findDomainViaGoogle(entry.name, { request: deps.request });
@@ -145,7 +148,7 @@ export const resolveCompanyDomains = async (jobs, { lookup = true, deps = {} } =
         } catch (error) {
             console.error(`Domain lookup failed for ${entry.name}:`, error.response?.status || error.message);
         }
-    }
+    }));
 
     return stats;
 };

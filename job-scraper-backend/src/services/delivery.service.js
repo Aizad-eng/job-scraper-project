@@ -6,8 +6,10 @@ import {
     DELIVERY_TIMEOUT_MS,
     DELIVERY_MAX_ATTEMPTS,
     DELIVERY_RETRY_BASE_MS,
+    DELIVERY_RETRY_MAX_MS,
     DELIVERY_PROGRESS_EVERY,
 } from '../constants/deliveryConstants.js';
+import { withRetry, isTransientHttpError } from '../helpers/limiter.js';
 import { groupByCompany } from '../helpers/jobHelpers.js';
 
 // ---------------------------------------------------------------------------
@@ -149,12 +151,6 @@ export const buildSamplePayload = (mode, meta = {}) => {
 // Sending
 // ---------------------------------------------------------------------------
 
-const isRetryable = (error) => {
-    const status = error.response?.status;
-    if (!status) return true;                 // network / timeout
-    return status === 408 || status === 429 || status >= 500;
-};
-
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 // Global spacing between requests: at most DELIVERY_MAX_PER_SECOND per second
@@ -178,29 +174,24 @@ export const postOnce = async (url, payload) => {
     });
 };
 
+// Retries 408 / 429 / 5xx / network errors with growing waits (Retry-After
+// wins when the receiver sends one). Other 4xx fail straight away.
 export const postWithRetry = async (url, payload) => {
-    let lastError;
-
-    for (let attempt = 1; attempt <= DELIVERY_MAX_ATTEMPTS; attempt += 1) {
-        try {
-            const response = await postOnce(url, payload);
-            return { ok: true, status: response.status };
-        } catch (error) {
-            lastError = error;
-            if (!isRetryable(error) || attempt === DELIVERY_MAX_ATTEMPTS) break;
-
-            const retryAfter = Number(error.response?.headers?.['retry-after']);
-            const wait = retryAfter ? retryAfter * 1000 : DELIVERY_RETRY_BASE_MS * 2 ** (attempt - 1);
-            await sleep(wait);
-        }
+    try {
+        const response = await withRetry(() => postOnce(url, payload), {
+            attempts: DELIVERY_MAX_ATTEMPTS,
+            baseMs: DELIVERY_RETRY_BASE_MS,
+            maxMs: DELIVERY_RETRY_MAX_MS,
+            shouldRetry: isTransientHttpError,
+        });
+        return { ok: true, status: response.status };
+    } catch (error) {
+        const status = error.response?.status;
+        const message = status
+            ? `HTTP ${status}${error.response?.statusText ? ` ${error.response.statusText}` : ''}`
+            : error.message || 'Unknown error';
+        return { ok: false, status: status ?? null, error: message };
     }
-
-    const status = lastError?.response?.status;
-    const message = status
-        ? `HTTP ${status}${lastError.response?.statusText ? ` ${lastError.response.statusText}` : ''}`
-        : lastError?.message || 'Unknown error';
-
-    return { ok: false, status: status ?? null, error: message };
 };
 
 /**

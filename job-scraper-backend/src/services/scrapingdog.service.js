@@ -2,11 +2,31 @@ import axios from 'axios';
 import {
     SCRAPINGDOG_AI_MODE_URL,
     SCRAPINGDOG_TIMEOUT_MS,
+    SCRAPINGDOG_MAX_CONCURRENT,
+    SCRAPINGDOG_MAX_ATTEMPTS,
+    SCRAPINGDOG_RETRY_BASE_MS,
     COMPANY_CHECK_ANSWERS,
     buildCompanyCheckQuery,
 } from '../constants/aiConstants.js';
+import { createLimiter, withRetry, isTransientHttpError } from '../helpers/limiter.js';
 
 export const hasScrapingDog = () => Boolean(process.env.SCRAPPINGDOG_KEY);
+
+// One limiter for every ScrapingDog endpoint, so the account-wide cap of
+// 5 concurrent requests holds even with several jobs running.
+const limiter = createLimiter(SCRAPINGDOG_MAX_CONCURRENT);
+
+export const scrapingDogGet = (url, config, request = axios.get, label = 'ScrapingDog') =>
+    limiter.run(() =>
+        withRetry(() => request(url, config), {
+            attempts: SCRAPINGDOG_MAX_ATTEMPTS,
+            baseMs: SCRAPINGDOG_RETRY_BASE_MS,
+            shouldRetry: isTransientHttpError,
+            label,
+        })
+    );
+
+export const scrapingDogLoad = () => ({ active: limiter.active, waiting: limiter.waiting });
 
 // Google AI Mode returns the answer as text_blocks (paragraphs, headings,
 // lists, nested lists). Collect every snippet, in order.
@@ -75,7 +95,7 @@ export const normaliseCompanyCheck = (obj) => {
  * was not clean JSON. Throws on HTTP / network errors (no credits, 4xx…).
  */
 export const askScrapingDog = async (website, { request = axios.get } = {}) => {
-    const response = await request(SCRAPINGDOG_AI_MODE_URL, {
+    const response = await scrapingDogGet(SCRAPINGDOG_AI_MODE_URL, {
         params: {
             api_key: process.env.SCRAPPINGDOG_KEY,
             query: buildCompanyCheckQuery(website),
@@ -84,7 +104,7 @@ export const askScrapingDog = async (website, { request = axios.get } = {}) => {
             safe: 'off',
         },
         timeout: SCRAPINGDOG_TIMEOUT_MS,
-    });
+    }, request, `AI Mode ${website}`);
 
     const data = response.data;
     if (!data || typeof data !== 'object') throw new Error('ScrapingDog returned an empty response');

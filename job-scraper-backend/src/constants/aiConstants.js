@@ -47,9 +47,15 @@ export const CLAUDE_COERCE_SYSTEM_PROMPT =
 export const COMPANY_CHECK_ANSWERS = ['Yes', 'No', 'Unknown'];
 
 // how many companies to classify at once
-export const AI_BATCH_SIZE = 3;
+export const AI_BATCH_SIZE = 5;   // the limiter keeps ScrapingDog at 5 in flight anyway
 
 // delay between batch tests
 export const AI_BATCH_DELAY_MS = 2000;
 
 export const SCRAPINGDOG_TIMEOUT_MS = 90_000;
+
+// ScrapingDog allows 5 concurrent requests per account. Shared by the
+// AI Mode company check and the Google domain lookup, across every job.
+export const SCRAPINGDOG_MAX_CONCURRENT = 5;
+export const SCRAPINGDOG_MAX_ATTEMPTS = 3;
+export const SCRAPINGDOG_RETRY_BASE_MS = 2_000;

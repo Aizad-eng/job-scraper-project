@@ -72,6 +72,8 @@ These are only called when "Staffing agencies" is set to *Remove agencies* or *K
 
 **Cooldown.** After delivery, each sent company gets `lastSentAt` on its memory record. Before delivery, any company sent within the search's cooldown window is dropped and reported as *Company sent recently (cooldown)*. This works across one-off runs and all schedules, in both row modes.
 
+**ScrapingDog limits.** The account allows 5 concurrent requests. One shared limiter covers the AI Mode check and the Google domain lookup across every running job, so it never goes above 5 in flight; 429 / 5xx / network errors are retried up to 3 times with 2 s, 4 s waits, while a 402 (no credits) fails straight away and falls through to the fallbacks.
+
 **How the company check decides.** For each unique company with a website: ScrapingDog asks Google AI Mode to visit the site and answer `is_recruitment_firm: Yes / No / Unknown` with an industry and a 2–3 sentence description. If the answer is clean JSON it is used as-is. If it comes back as prose or fenced text, Claude (`claude-opus-5`, structured output) converts it into the same record. `Yes` removes (or flags) the company, `No` keeps it, `Unknown` keeps it undecided. If ScrapingDog is not configured, errors (for example out of credits), or gives nothing usable, the old GPT / Perplexity classifiers run when their keys are set; otherwise the company is kept. Every row carries `aiIndustry`, `aiSummary` and `aiSource` from whichever check ran.
 
 ### Backend
@@ -208,7 +210,7 @@ One row per **company** carries the same company fields plus `openRolesFound`, `
 
 `isStaffingAgency` is `true`/`false` when the company check decided, `null` when it answered Unknown or agency checks are off, and `false` after the word screen only. `aiSource` is `scrapingdog`, `scrapingdog+claude`, `gpt`, `perplexity` or `skipped`.
 
-Delivery is capped at 5 requests per second (Clay's webhook limit), waits 15 s per request, and retries 429 / 5xx / network errors up to four times with backoff (honouring `Retry-After`). A run is marked failed only if **every** request was rejected; partial failures are reported with the last error.
+Delivery goes easy on the receiver: at most 2 requests in flight and 3 per second (Clay allows 5), 20 s per request, and 408 / 429 / 5xx / network errors are retried up to 6 times with growing waits of 2, 4, 8, 16 and 30 seconds (`Retry-After` wins when sent). A run is marked failed only if **every** request was rejected; partial failures are reported with the last error.
 
 ---
 
