@@ -4,6 +4,7 @@ import {
     MATCH_IN_FIELD_MAP,
 } from '../constants/filterConstants.js';
 import { PLATFORMS } from '../constants/apifyConstants.js';
+import { BANK_INDUSTRY_WORDS, BANK_NAMES, BANK_SENIOR_TITLE_WORDS, BANK_VP_TITLE_WORDS } from '../constants/filterConstants.js';
 
 // '51-200 employees' -> { min: 51, max: 200 }
 // '51 to 200'        -> { min: 51, max: 200 }
@@ -260,4 +261,22 @@ export const dedupeListings = (jobs) => {
     });
 
     return { kept, removed };
+};
+
+export const isBank = (job) => {
+    const industry = normalizeForMatch([job.companyIndustry, job.industries].filter(Boolean).join(' '));
+    if (BANK_INDUSTRY_WORDS.some((w) => phraseMatches(industry, w))) return true;
+    const name = normalizeForMatch(job.companyName);
+    if (phraseMatches(name, 'bank') || phraseMatches(name, 'banking') || phraseMatches(name, 'bancorp')) return true;
+    return BANK_NAMES.some((n) => phraseMatches(name, n));
+};
+
+// A VP-grade title at a bank that is not SVP/EVP/MD/Chief/Head/President.
+export const isBankVpTitle = (job) => {
+    if (!isBank(job)) return false;
+    const title = normalizeForMatch(job.title);
+    if (BANK_SENIOR_TITLE_WORDS.some((w) => phraseMatches(title, w))) return false;
+    // a plain "President" (not "Vice President") is senior
+    if (phraseMatches(title, 'president') && !phraseMatches(title, 'vice president') && !phraseMatches(title, 'assistant vice president')) return false;
+    return BANK_VP_TITLE_WORDS.some((w) => phraseMatches(title, w));
 };

@@ -7,7 +7,7 @@ export const PRESETS = [
     {
         id: 'senior-leadership',
         label: 'Senior leadership (retained search)',
-        hint: 'Director, VP and C-level roles only. Whole-word matching on the job title, with the usual title traps excluded (assistant to, art director, principal engineer, HR business partner…).',
+        hint: 'Director, VP and C-level roles only. Whole-word matching on the job title, the usual title traps excluded (assistant to, art director, principal engineer, HR business partner, chief of staff…), VP titles at banks dropped, salary floor 150,000 with unknown pay kept.',
         apply: {
             filterKeywords: split(
                 'chief, ceo, cfo, coo, cto, cio, cmo, cro, chro, cpo, cso, ciso, cdo, cco, clo, cao, ' +
@@ -26,13 +26,18 @@ export const PRESETS = [
                 'chief engineer, chief resident, chief petty officer, vice principal, school principal, ' +
                 'principal engineer, principal developer, principal designer, principal consultant, principal scientist, principal architect, principal software engineer, ' +
                 'partner manager, partner success, channel partner, business partner, hr business partner, hrbp, sales partner, delivery partner, founding engineer, ' +
+                'medical director, program director, chief of staff, ' +
                 'avp, assistant vice president, air traffic controller, document controller, quality controller, ' +
                 'part time, part-time, contract, contractor, temporary, temp, freelance, commission only, 1099, hourly, seasonal, volunteer, unpaid'
             ),
             excludeMatchIn: ['title'],
             wholeWordMatch: true,
+            dropBankVps: true,
             seniorityLevels: ['Director', 'Executive'],
             employmentTypes: ['Full-time'],
+            salaryMin: 150000,
+            salaryMax: '',
+            includeNoSalary: true,
         },
     },
 ];

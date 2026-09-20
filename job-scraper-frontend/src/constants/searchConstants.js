@@ -1,3 +1,5 @@
+import { PRESETS } from './presetConstants.js';
+
 export const PLATFORMS = [
     { value: 'linkedin', label: 'LinkedIn' },
     { value: 'indeed', label: 'Indeed' },
@@ -50,7 +52,11 @@ export const EMPLOYMENT_TYPE_OPTIONS = [
     'Full-time', 'Part-time', 'Contract', 'Temporary', 'Internship',
 ];
 
-export const DEFAULT_FORM_VALUES = {
+// A new search starts with the senior-leadership preset loaded; remove
+// or change anything you like before starting.
+export const DEFAULT_PRESET_ID = 'senior-leadership';
+
+const BASE_FORM_VALUES = {
     keywords: [],
     location: '',
     platforms: ['linkedin'],
@@ -65,6 +71,7 @@ export const DEFAULT_FORM_VALUES = {
     excludeWords: [],
     excludeMatchIn: ['title'],
     wholeWordMatch: true,
+    dropBankVps: false,
     includeIndustries: [],
     excludeIndustries: [],
     excludeCompanies: [],
@@ -83,6 +90,11 @@ export const DEFAULT_FORM_VALUES = {
     launchSpacingMinutes: 0,
 };
 
+export const DEFAULT_FORM_VALUES = {
+    ...BASE_FORM_VALUES,
+    ...(PRESETS.find((p) => p.id === DEFAULT_PRESET_ID)?.apply || {}),
+};
+
 export const JOBS_PER_KEYWORD_OPTIONS = [10, 25, 50, 100, 250, 500];
 
 export const FIELD_HINTS = {
@@ -91,6 +103,7 @@ export const FIELD_HINTS = {
     companySizes: 'Pick the bands you want. Nothing selected means any size.',
     includeUnknownSize: 'Some listings have no company size. Tick to keep them anyway.',
     filterKeywords: 'Keep a listing only if it mentions at least one of these. Multi-word phrases are fine.',
+    dropBankVps: 'In banks "Vice President" and "AVP" are mid-level grades. Drops those titles when the company is a bank; SVP, EVP, MD, Chief and Head of are kept.',
     wholeWordMatch: 'On: "cto" matches CTO but not "director", "vp" not "vpn". Off: plain substring match, so "react" also matches "reactjs".',
     excludeWords: 'Drop a listing if it mentions any of these, for example intern, senior, clearance.',
     includeIndustries: 'Keep only companies whose industry contains one of these, for example software, healthcare.',

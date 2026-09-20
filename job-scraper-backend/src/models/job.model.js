@@ -29,6 +29,7 @@ const jobSchema = new mongoose.Schema(
             excludeWords: [String],
             excludeMatchIn: [String],
             wholeWordMatch: { type: Boolean, default: true },
+            dropBankVps: { type: Boolean, default: false },
             includeIndustries: [String],
             excludeIndustries: [String],
             excludeCompanies: [String],

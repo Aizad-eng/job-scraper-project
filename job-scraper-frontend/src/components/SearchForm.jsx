@@ -7,6 +7,7 @@ import { PRESETS } from "../constants/presetConstants.js";
 import {
   PLATFORMS,
   DEFAULT_FORM_VALUES,
+  DEFAULT_PRESET_ID,
   JOBS_PER_KEYWORD_OPTIONS,
   FIELD_HINTS,
   POSTED_WITHIN_OPTIONS,
@@ -71,11 +72,13 @@ export default function SearchForm({
   const setField = (key, value) =>
     setValues((prev) => ({ ...prev, [key]: value }));
 
-  const [appliedPreset, setAppliedPreset] = useState(null);
+  const [appliedPreset, setAppliedPreset] = useState(
+    initialValues || editingSchedule ? null : DEFAULT_PRESET_ID,
+  );
   const applyPreset = (preset) => {
     setValues((prev) => ({ ...prev, ...preset.apply }));
     setAppliedPreset(preset.id);
-    if (preset.apply.seniorityLevels?.length || preset.apply.employmentTypes?.length) setShowMore(true);
+    if (preset.apply.seniorityLevels?.length || preset.apply.employmentTypes?.length || preset.apply.dropBankVps) setShowMore(true);
   };
 
   const handleSubmit = () => {
@@ -456,6 +459,16 @@ export default function SearchForm({
               allLabel="Any"
               compact
             />
+            <label className="check">
+              <input
+                type="checkbox"
+                checked={values.dropBankVps}
+                onChange={(event) => setField("dropBankVps", event.target.checked)}
+              />
+              <span>Drop VP titles at banks</span>
+              <em>{FIELD_HINTS.dropBankVps}</em>
+            </label>
+
             <label className="check">
               <input
                 type="checkbox"

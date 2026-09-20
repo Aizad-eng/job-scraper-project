@@ -13,6 +13,7 @@ import {
     findIndustry,
     findExcludedCompany,
     companyKey,
+    isBankVpTitle,
 } from '../helpers/jobHelpers.js';
 
 const removal = (job, reason, detail) => ({
@@ -32,6 +33,7 @@ export const applyRuleFilters = (jobs, options = {}) => {
         excludeWords = [],
         excludeMatchIn = DEFAULT_MATCH_IN,
         wholeWordMatch = true,
+        dropBankVps = false,
         includeIndustries = [],
         excludeIndustries = [],
         excludeCompanies = [],
@@ -84,6 +86,11 @@ export const applyRuleFilters = (jobs, options = {}) => {
         const excludedWord = findExcludedWord(job, excludeWords, excludeMatchIn, wholeWordMatch);
         if (excludedWord) {
             removed.push(removal(job, REMOVAL_REASON.EXCLUDED_WORD, excludedWord));
+            return;
+        }
+
+        if (dropBankVps && isBankVpTitle(job)) {
+            removed.push(removal(job, REMOVAL_REASON.BANK_VP, job.companyName));
             return;
         }
 

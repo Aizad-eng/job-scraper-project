@@ -321,6 +321,12 @@ export default function RunProgress({ jobId, status, onReset, onRerun, onOpenSch
                 </dd>
               </div>
             )}
+            {status.inputs.dropBankVps && (
+              <div>
+                <dt>Bank VPs</dt>
+                <dd>Dropped</dd>
+              </div>
+            )}
             {status.inputs.launchSpacingMinutes > 0 && (
               <div>
                 <dt>Keyword spacing</dt>

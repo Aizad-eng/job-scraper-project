@@ -82,6 +82,7 @@ export const REMOVAL_REASON_LABELS = {
     company_cooldown: 'Company sent recently (cooldown)',
     duplicate_listing: 'Duplicate listing in this run',
     salary: 'Salary outside your range',
+    bank_vp: 'VP title at a bank (mid-level there)',
 };
 
 export const AGENCY_MODE_LABELS = {

@@ -52,6 +52,7 @@ export const REMOVAL_REASON = {
     COMPANY_COOLDOWN: 'company_cooldown',
     DUPLICATE_LISTING: 'duplicate_listing',
     SALARY: 'salary',
+    BANK_VP: 'bank_vp',
 };
 
 export const REMOVAL_REASON_LABELS = {
@@ -71,6 +72,7 @@ export const REMOVAL_REASON_LABELS = {
     company_cooldown: 'Company sent recently (cooldown)',
     duplicate_listing: 'Duplicate listing in this run',
     salary: 'Salary outside your range',
+    bank_vp: 'VP title at a bank (mid-level there)',
 };
 
 export const STRIPPED_JOB_FIELDS = [
@@ -100,3 +102,22 @@ export const SENIORITY_LEVELS = [
 export const EMPLOYMENT_TYPES = [
     'Full-time', 'Part-time', 'Contract', 'Temporary', 'Internship', 'Volunteer', 'Other',
 ];
+
+// In banks "Vice President" / "AVP" is a mid-level grade, not leadership.
+// A company counts as a bank when its industry says so, its name contains
+// "bank" as a word, or it is one of these.
+export const BANK_INDUSTRY_WORDS = ['banking', 'investment banking', 'capital markets', 'financial services'];
+export const BANK_NAMES = [
+    'jpmorgan', 'jp morgan', 'chase', 'goldman sachs', 'morgan stanley', 'citi', 'citigroup', 'citibank',
+    'bank of america', 'merrill', 'wells fargo', 'barclays', 'hsbc', 'deutsche bank', 'ubs', 'credit suisse',
+    'bnp paribas', 'societe generale', 'rbc', 'royal bank', 'td bank', 'toronto-dominion', 'scotiabank', 'bmo', 'cibc',
+    'u.s. bank', 'us bank', 'pnc', 'truist', 'capital one', 'state street', 'bny mellon', 'bny', 'northern trust',
+    'jefferies', 'lazard', 'evercore', 'nomura', 'mizuho', 'mufg', 'standard chartered', 'santander', 'ing',
+    'natwest', 'lloyds', 'macquarie', 'raymond james', 'stifel', 'piper sandler', 'william blair', 'houlihan lokey',
+    'moelis', 'pjt partners', 'rothschild', 'guggenheim', 'cowen', 'baird', 'keybank', 'fifth third', 'citizens bank',
+    'regions bank', 'huntington', 'm&t bank', 'first republic', 'silicon valley bank', 'svb', 'ally', 'discover',
+    'american express', 'amex', 'synchrony', 'charles schwab', 'fidelity', 'vanguard', 'blackrock', 'invesco',
+];
+// titles that still count as senior inside a bank
+export const BANK_SENIOR_TITLE_WORDS = ['svp', 'evp', 'senior vice president', 'executive vice president', 'group vice president', 'managing director', 'md', 'chief', 'head of', 'ceo', 'cfo', 'coo', 'cto', 'cio', 'cro'];
+export const BANK_VP_TITLE_WORDS = ['vp', 'v.p.', 'vice president', 'avp', 'assistant vice president'];
