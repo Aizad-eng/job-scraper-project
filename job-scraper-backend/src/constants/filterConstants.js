@@ -47,6 +47,7 @@ export const REMOVAL_REASON = {
     SENIORITY: 'seniority',
     EMPLOYMENT_TYPE: 'employment_type',
     PER_COMPANY_CAP: 'per_company_cap',
+    ALREADY_SENT: 'already_sent',
 };
 
 export const REMOVAL_REASON_LABELS = {
@@ -61,6 +62,7 @@ export const REMOVAL_REASON_LABELS = {
     seniority: 'Seniority level',
     employment_type: 'Employment type',
     per_company_cap: 'Over the per-company cap',
+    already_sent: 'Already sent by this schedule',
 };
 
 export const STRIPPED_JOB_FIELDS = [

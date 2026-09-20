@@ -80,3 +80,37 @@ export const describeRun = (values) => {
     const listings = runs * Number(values.jobsPerKeyword || 0);
     return `${titles} ${titles === 1 ? 'title' : 'titles'} × ${boards} ${boards === 1 ? 'board' : 'boards'} = ${runs} ${runs === 1 ? 'scrape' : 'scrapes'}, up to ${listings.toLocaleString()} listings`;
 };
+
+export const formatDateTime = (iso) => {
+    if (!iso) return '';
+    return new Date(iso).toLocaleString(undefined, {
+        weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit',
+    });
+};
+
+// "in 3h 12m", "in 2 days", "overdue"
+export const formatUntil = (iso) => {
+    if (!iso) return '';
+    const diff = new Date(iso).getTime() - Date.now();
+    if (diff <= 0) return 'any moment now';
+    const minutes = Math.round(diff / 60000);
+    if (minutes < 60) return `in ${minutes} min`;
+    const hours = Math.floor(minutes / 60);
+    if (hours < 24) return `in ${hours}h ${minutes % 60}m`;
+    const days = Math.floor(hours / 24);
+    return `in ${days} ${days === 1 ? 'day' : 'days'}`;
+};
+
+export const validateScheduleFields = (fields) => {
+    const errors = {};
+    if (fields.frequency === 'weekdays' && !fields.weekdays.length) {
+        errors.weekdays = 'Pick at least one day';
+    }
+    if (fields.frequency === 'every_n_days' && !(Number(fields.everyDays) >= 1)) {
+        errors.everyDays = 'Enter 1 or more';
+    }
+    if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(fields.runTime || '')) {
+        errors.runTime = 'Pick a time';
+    }
+    return errors;
+};

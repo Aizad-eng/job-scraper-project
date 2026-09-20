@@ -87,6 +87,13 @@ export const buildPayloads = (jobs, mode, meta = {}) => {
     return jobs.map((job) => buildJobPayload(job, meta));
 };
 
+// The identity of a payload for "already sent" checks: the listing URL, or
+// the company domain / name in company mode.
+export const payloadKey = (payload, mode) =>
+    mode === DELIVERY_MODE.COMPANY
+        ? (payload.companyDomain || payload.companyName || '').toLowerCase().trim()
+        : (payload.jobUrl || `${payload.companyName}|${payload.jobTitle}`).toLowerCase().trim();
+
 // A realistic record so the receiver can set up its columns.
 export const buildSamplePayload = (mode, meta = {}) => {
     const sampleJob = {
@@ -192,6 +199,7 @@ export const deliverAll = async (url, payloads, onProgress = async () => {}) => 
     let failed = 0;
     let lastError = null;
     let sinceReport = 0;
+    const failedIndexes = [];
 
     const report = async () => {
         sinceReport = 0;
@@ -200,7 +208,8 @@ export const deliverAll = async (url, payloads, onProgress = async () => {}) => 
 
     const worker = async () => {
         while (index < payloads.length) {
-            const payload = payloads[index];
+            const current = index;
+            const payload = payloads[current];
             index += 1;
 
             const result = await postWithRetry(url, payload);
@@ -208,6 +217,7 @@ export const deliverAll = async (url, payloads, onProgress = async () => {}) => 
             else {
                 failed += 1;
                 lastError = result.error;
+                failedIndexes.push(current);
             }
 
             sinceReport += 1;
@@ -222,5 +232,5 @@ export const deliverAll = async (url, payloads, onProgress = async () => {}) => 
     await Promise.all(workers);
     await report();
 
-    return { sent, failed, lastError };
+    return { sent, failed, lastError, failedIndexes };
 };

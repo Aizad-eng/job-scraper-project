@@ -1,6 +1,8 @@
 import { useState } from "react";
 import TagInput from "./TagInput.jsx";
 import ChipGroup from "./ChipGroup.jsx";
+import ScheduleFields from "./ScheduleFields.jsx";
+import { REPEAT_OPTIONS, DEFAULT_SCHEDULE_FIELDS } from "../constants/scheduleConstants.js";
 import {
   PLATFORMS,
   DEFAULT_FORM_VALUES,
@@ -16,6 +18,7 @@ import {
 } from "../constants/searchConstants.js";
 import {
   validateForm,
+  validateScheduleFields,
   describeRun,
   isValidWebhookUrl,
 } from "../helpers/formatHelpers.js";
@@ -36,30 +39,55 @@ const restoreValues = (initialValues) => {
   }, {});
 };
 
+const restoreSchedule = (editingSchedule) => {
+  if (!editingSchedule) return DEFAULT_SCHEDULE_FIELDS;
+  return Object.keys(DEFAULT_SCHEDULE_FIELDS).reduce((acc, key) => {
+    acc[key] = editingSchedule[key] ?? DEFAULT_SCHEDULE_FIELDS[key];
+    return acc;
+  }, {});
+};
+
 export default function SearchForm({
   onSubmit,
+  onSaveSchedule,
+  onCancelEdit,
   isSubmitting,
   submitError,
   initialValues,
+  editingSchedule = null,
 }) {
-  const [values, setValues] = useState(() => restoreValues(initialValues));
+  const [values, setValues] = useState(() =>
+    restoreValues(editingSchedule ? editingSchedule.inputs : initialValues),
+  );
   const [errors, setErrors] = useState({});
   const [showMore, setShowMore] = useState(false);
   const [test, setTest] = useState({ state: "idle", message: "" });
+  const [repeat, setRepeat] = useState(editingSchedule ? "schedule" : "once");
+  const [schedule, setSchedule] = useState(() => restoreSchedule(editingSchedule));
+  const isSchedule = repeat === "schedule";
 
   const setField = (key, value) =>
     setValues((prev) => ({ ...prev, [key]: value }));
 
   const handleSubmit = () => {
-    const found = validateForm(values);
+    const found = {
+      ...validateForm(values),
+      ...(isSchedule ? validateScheduleFields(schedule) : {}),
+    };
     setErrors(found);
     if (Object.keys(found).length) {
-      const first = document.querySelector(".field-error");
-      first?.scrollIntoView({ behavior: "smooth", block: "center" });
+      // let React paint the errors before scrolling to the first one
+      setTimeout(() => {
+        document
+          .querySelector(".field-error")
+          ?.scrollIntoView({ behavior: "smooth", block: "center" });
+      }, 0);
       return;
     }
     rememberWebhook(values.webhookUrl.trim());
-    onSubmit({ ...values, webhookUrl: values.webhookUrl.trim() });
+    const inputs = { ...values, webhookUrl: values.webhookUrl.trim() };
+    if (isSchedule) onSaveSchedule(inputs, schedule, editingSchedule?.scheduleId || null);
+    else onSubmit(inputs);
   };
 
   const handleTest = async () => {
@@ -103,10 +131,11 @@ export default function SearchForm({
   return (
     <div className="panel">
       <header className="panel-head">
-        <h1>Find companies that are hiring</h1>
+        <h1>{editingSchedule ? "Edit schedule" : "Find companies that are hiring"}</h1>
         <p>
-          Scrape job listings, drop the staffing agencies, and send what's left
-          straight to your webhook.
+          {editingSchedule
+            ? "Change the search or the timing. Future runs use the new settings."
+            : "Scrape job listings, drop the staffing agencies, and send what's left straight to your webhook."}
         </p>
       </header>
 
@@ -427,6 +456,42 @@ export default function SearchForm({
         </div>
       </section>
 
+      {/* ------------------------------------------------------------ */}
+      <section className="section">
+        <h2 className="section-title">
+          <span className="step">5</span> Repeat
+        </h2>
+
+        {!editingSchedule && (
+          <div className="field">
+            <div className="option-list horizontal">
+              {REPEAT_OPTIONS.map((option) => (
+                <label
+                  key={option.value}
+                  className={`option ${repeat === option.value ? "is-on" : ""}`}
+                >
+                  <input
+                    type="radio"
+                    name="repeat"
+                    value={option.value}
+                    checked={repeat === option.value}
+                    onChange={() => setRepeat(option.value)}
+                  />
+                  <span>
+                    <strong>{option.label}</strong>
+                    <em>{option.hint}</em>
+                  </span>
+                </label>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {isSchedule && (
+          <ScheduleFields fields={schedule} onChange={setSchedule} errors={errors} />
+        )}
+      </section>
+
       {submitError && <p className="banner-error">{submitError}</p>}
 
       <div className="submit-row">
@@ -436,9 +501,21 @@ export default function SearchForm({
           onClick={handleSubmit}
           disabled={isSubmitting}
         >
-          {isSubmitting ? "Starting…" : "Start search"}
+          {isSubmitting
+            ? "Saving…"
+            : editingSchedule
+              ? "Save changes"
+              : isSchedule
+                ? "Save schedule"
+                : "Start search"}
         </button>
-        <span className="submit-note">{describeRun(values)}</span>
+        {editingSchedule ? (
+          <button className="ghost" type="button" onClick={onCancelEdit}>
+            Cancel
+          </button>
+        ) : (
+          <span className="submit-note">{describeRun(values)}</span>
+        )}
       </div>
     </div>
   );

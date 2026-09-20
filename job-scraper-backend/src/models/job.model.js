@@ -4,6 +4,9 @@ import { JOB_STATUS } from '../constants/apifyConstants.js';
 const jobSchema = new mongoose.Schema(
     {
         jobId: { type: String, required: true, unique: true, index: true },
+        // set when a schedule started this run
+        scheduleId: { type: String, default: null, index: true },
+        skipAlreadySent: { type: Boolean, default: false },
         status: {
             type: String,
             enum: Object.values(JOB_STATUS),

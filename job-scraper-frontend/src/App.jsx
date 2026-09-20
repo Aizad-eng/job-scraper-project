@@ -2,7 +2,13 @@ import { useState, useEffect, useCallback } from "react";
 import SearchForm from "./components/SearchForm.jsx";
 import RunProgress from "./components/RunProgress.jsx";
 import RecentRuns from "./components/RecentRuns.jsx";
-import { startScrape, fetchJobStatus } from "./helpers/apiHelpers.js";
+import Schedules from "./components/Schedules.jsx";
+import {
+  startScrape,
+  fetchJobStatus,
+  createSchedule,
+  updateSchedule,
+} from "./helpers/apiHelpers.js";
 import { isRunning } from "./helpers/formatHelpers.js";
 import {
   getRecentRuns,
@@ -12,29 +18,49 @@ import {
 } from "./helpers/storageHelpers.js";
 import { POLL_INTERVAL_MS, FINISHED_STATUSES } from "./constants/statusConstants.js";
 
-const readJobFromUrl = () => new URLSearchParams(window.location.search).get("job");
+const readRoute = () => {
+  const params = new URLSearchParams(window.location.search);
+  return { jobId: params.get("job"), view: params.get("view") || "search" };
+};
+
+const writeRoute = ({ jobId, view }) => {
+  const params = new URLSearchParams();
+  if (jobId) params.set("job", jobId);
+  else if (view && view !== "search") params.set("view", view);
+  const query = params.toString();
+  window.history.pushState(null, "", query ? `?${query}` : window.location.pathname);
+};
 
 export default function App() {
-  const [jobId, setJobId] = useState(readJobFromUrl);
+  const [route, setRoute] = useState(readRoute);
   const [status, setStatus] = useState(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState("");
   const [prefill, setPrefill] = useState(null);
+  const [editingSchedule, setEditingSchedule] = useState(null);
+  const [flash, setFlash] = useState("");
   const [recentRuns, setRecentRuns] = useState(getRecentRuns);
 
-  const openJob = useCallback((id) => {
+  const { jobId, view } = route;
+
+  const go = useCallback((next, { replace = false } = {}) => {
     setStatus(null);
     setSubmitError("");
-    setJobId(id);
-    window.history.replaceState(null, "", id ? `?job=${id}` : window.location.pathname);
+    setRoute(next);
+    if (!replace) writeRoute(next);
+    window.scrollTo({ top: 0 });
   }, []);
+
+  const openJob = useCallback((id) => go({ jobId: id, view: "search" }), [go]);
+  const openSearch = useCallback(() => go({ jobId: null, view: "search" }), [go]);
+  const openSchedules = useCallback(() => go({ jobId: null, view: "schedules" }), [go]);
 
   // browser back / forward
   useEffect(() => {
-    const onPop = () => openJob(readJobFromUrl());
+    const onPop = () => go(readRoute(), { replace: true });
     window.addEventListener("popstate", onPop);
     return () => window.removeEventListener("popstate", onPop);
-  }, [openJob]);
+  }, [go]);
 
   useEffect(() => {
     if (!jobId) return;
@@ -86,7 +112,6 @@ export default function App() {
       setRecentRuns(getRecentRuns());
       setPrefill(null);
       openJob(result.jobId);
-      window.scrollTo({ top: 0 });
     } catch (error) {
       setSubmitError(error.message);
     } finally {
@@ -94,14 +119,57 @@ export default function App() {
     }
   };
 
+  const handleSaveSchedule = async (inputs, scheduleFields, scheduleId) => {
+    setIsSubmitting(true);
+    setSubmitError("");
+
+    try {
+      if (scheduleId) {
+        await updateSchedule(scheduleId, { inputs, ...scheduleFields });
+        setFlash("Schedule updated.");
+      } else {
+        await createSchedule({ inputs, ...scheduleFields });
+        setFlash("Schedule saved. It will run at the next scheduled time.");
+      }
+      setEditingSchedule(null);
+      setPrefill(null);
+      openSchedules();
+    } catch (error) {
+      setSubmitError(error.message);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleEditSchedule = (schedule) => {
+    setEditingSchedule(schedule);
+    setPrefill(null);
+    setFlash("");
+    openSearch();
+  };
+
+  const handleNewFromSchedules = () => {
+    setEditingSchedule(null);
+    setPrefill(null);
+    setFlash("");
+    openSearch();
+  };
+
+  const handleCancelEdit = () => {
+    setEditingSchedule(null);
+    openSchedules();
+  };
+
   const handleReset = () => {
     setPrefill(null);
-    openJob(null);
+    setEditingSchedule(null);
+    openSearch();
   };
 
   const handleRerun = () => {
     if (status?.inputs) setPrefill(status.inputs);
-    openJob(null);
+    setEditingSchedule(null);
+    openSearch();
   };
 
   const handleForget = (id) => {
@@ -109,8 +177,32 @@ export default function App() {
     setRecentRuns(getRecentRuns());
   };
 
+  const showNav = !jobId;
+
   return (
     <main className="shell">
+      {showNav && (
+        <nav className="topnav" aria-label="Sections">
+          <button
+            type="button"
+            className={view === "search" ? "is-on" : ""}
+            onClick={handleNewFromSchedules}
+          >
+            New search
+          </button>
+          <button
+            type="button"
+            className={view === "schedules" ? "is-on" : ""}
+            onClick={() => {
+              setFlash("");
+              openSchedules();
+            }}
+          >
+            Schedules
+          </button>
+        </nav>
+      )}
+
       {jobId ? (
         <>
           {submitError && !status && <p className="banner-error">{submitError}</p>}
@@ -119,18 +211,31 @@ export default function App() {
             status={status}
             onReset={handleReset}
             onRerun={handleRerun}
+            onOpenSchedules={openSchedules}
           />
         </>
+      ) : view === "schedules" ? (
+        <Schedules
+          onOpenRun={openJob}
+          onEdit={handleEditSchedule}
+          onNew={handleNewFromSchedules}
+          flash={flash}
+        />
       ) : (
         <>
           <SearchForm
-            key={prefill ? "prefilled" : "blank"}
+            key={editingSchedule ? `edit-${editingSchedule.scheduleId}` : prefill ? "prefilled" : "blank"}
             onSubmit={handleSubmit}
+            onSaveSchedule={handleSaveSchedule}
+            onCancelEdit={handleCancelEdit}
             isSubmitting={isSubmitting}
             submitError={submitError}
             initialValues={prefill}
+            editingSchedule={editingSchedule}
           />
-          <RecentRuns runs={recentRuns} onOpen={openJob} onForget={handleForget} />
+          {!editingSchedule && (
+            <RecentRuns runs={recentRuns} onOpen={openJob} onForget={handleForget} />
+          )}
         </>
       )}
     </main>

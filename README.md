@@ -29,6 +29,8 @@ User submits search
 
 Everything after the form submit runs in the background. Apify calls back via webhook when a scrape finishes, so the user can close the tab and return later. The job ID in the URL brings them back to it, and the form page lists recent runs.
 
+A search can also be saved as a **schedule**: every day, every N days, or chosen weekdays at a set time in the user's timezone. Scheduled runs skip listings the schedule already sent, so the webhook only receives new ones.
+
 ---
 
 ## Stack
@@ -125,8 +127,17 @@ Runs on `http://localhost:5173` and proxies `/api` to `http://localhost:5000` (s
 2. **Company size** — pick LinkedIn-style bands. Nothing selected means any size. Optionally keep companies whose size is unknown.
 3. **Filters** — how to handle staffing agencies, must-mention words, excluded words. *More filters* adds industries to keep or drop, companies to skip, seniority level, employment type, and a per-company cap.
 4. **Where to send results** — the webhook URL (remembered in the browser) and whether to send one row per job listing or one per company. **Send test row** POSTs a sample record marked `isTest: true` so the receiver can set up its columns before spending anything.
+5. **Repeat** — *Run once now*, or *Run on a schedule*: a name, how often (every day / every N days / chosen weekdays), the time of day, and whether to skip listings already sent. The timezone is taken from the browser.
 
 The progress page shows each stage with counts, why listings were removed, the settings used, and lets you run again with the same settings.
+
+### Schedules
+
+The **Schedules** tab lists every saved schedule with its next run, last run, and past runs. From there you can **Run now**, **Pause** / **Resume**, **Edit** (same form, pre-filled), **Delete**, or **Forget sent listings** so the next run sends everything again.
+
+How it runs: the backend checks every 30 seconds for schedules whose next run time has passed and starts them one at a time. If the server was down at the scheduled time, the run starts as soon as it is back. Each schedule remembers the job URLs (or company domains, in company mode) it has delivered for 120 days; a scheduled run drops those before sending and reports them as *Already sent by this schedule*.
+
+Render's free tier sleeps idle services, which would stall the scheduler. Use a paid instance type (the `starter` plan in `render.yaml`) or an external ping to keep it awake.
 
 ### Webhook payload
 
@@ -164,6 +175,7 @@ One row per **job listing** (default):
   "staffingAgencyReason": "gpt: Hires for its own product team",
 
   "runId": "…",
+  "scheduleId": "… or null",
   "sentAt": "2026-09-20T10:32:21.117Z"
 }
 ```
@@ -186,37 +198,50 @@ job-scraper-backend/
 │   ├── apifyConstants.js           Actor IDs, job statuses, posted-within mapping
 │   ├── filterConstants.js          Size bands, staffing words, agency modes, removal reasons
 │   ├── aiConstants.js              Model names, classifier prompt, batch sizes
-│   └── deliveryConstants.js        Delivery modes, concurrency, retry policy
+│   ├── deliveryConstants.js        Delivery modes, rate limit, retry policy
+│   └── scheduleConstants.js        Frequencies, tick interval, sent-listing retention
 ├── src/middleware/
 │   ├── auth.js                     Access-key gate and Apify webhook secret
 │   └── rateLimit.js                Brute-force guard for the password check
-├── src/models/job.model.js         The Job document — inputs, results, delivery stats
+├── src/models/
+│   ├── job.model.js                The Job document — inputs, results, delivery stats
+│   ├── schedule.model.js           A saved search with its timing and last-run info
+│   └── deliveredListing.model.js   What each schedule has already sent (TTL 120 days)
 ├── src/routes/
 │   ├── scrape.routes.js            POST /scrape, GET /job-status/:id, POST /test-webhook
+│   ├── schedule.routes.js          CRUD, run now, reset sent
 │   └── webhook.routes.js           POST /apify-webhook
 ├── src/controllers/
-│   ├── scrape.controller.js        Validates inputs, starts Apify runs, reports status
+│   ├── scrape.controller.js        Starts a one-off search, reports status
+│   ├── schedule.controller.js      Schedule CRUD and actions
 │   ├── webhook.controller.js       Apify callback + the whole pipeline
 │   └── testWebhook.controller.js   Sends one sample row to a webhook
 ├── src/services/
+│   ├── search.service.js           Input validation + launching Apify runs (shared)
+│   ├── scheduler.service.js        30-second tick that starts due schedules
 │   ├── apify.service.js            Triggers actors, fetches results (paginated)
 │   ├── filter.service.js           Rule filters and per-company cap
 │   ├── ai.service.js               GPT and Perplexity calls
 │   ├── classification.service.js   Batched agency classification
-│   └── delivery.service.js         Payload shapes, retrying POSTs, worker pool
-└── src/helpers/jobHelpers.js       Platform normalising, size parsing, word matching
+│   └── delivery.service.js         Payload shapes, rate-limited retrying POSTs
+└── src/helpers/
+    ├── jobHelpers.js               Platform normalising, size parsing, word matching
+    └── scheduleHelpers.js          Timezone math, next-run calculation
 
 job-scraper-frontend/src/
-├── App.jsx                         View switching, polling, recent runs, rerun prefill
+├── App.jsx                         Routing (search / run / schedules), polling, prefill
 ├── components/
 │   ├── PasswordGate.jsx            Password prompt before anything loads
-│   ├── SearchForm.jsx              The four-step form
+│   ├── SearchForm.jsx              The five-step form (also edits schedules)
+│   ├── ScheduleFields.jsx          Step 5: frequency, days, time, skip-sent
+│   ├── Schedules.jsx               Schedules tab: list, run now, pause, edit, delete
 │   ├── RunProgress.jsx             Stages, totals, removal reasons, settings, rerun
 │   ├── RecentRuns.jsx              Last runs from this browser
 │   ├── ChipGroup.jsx               Multi-select toggle buttons
 │   └── TagInput.jsx                Multi-value input (Enter, comma, paste)
 ├── constants/
 │   ├── searchConstants.js          Form defaults, options, hints
+│   ├── scheduleConstants.js        Repeat / frequency / weekday options
 │   └── statusConstants.js          API URL, poll interval, stages, labels
 └── helpers/
     ├── apiHelpers.js               Fetch wrappers

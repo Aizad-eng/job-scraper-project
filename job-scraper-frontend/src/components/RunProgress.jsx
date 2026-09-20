@@ -31,7 +31,7 @@ const shortUrl = (url = "") => {
   }
 };
 
-export default function RunProgress({ jobId, status, onReset, onRerun }) {
+export default function RunProgress({ jobId, status, onReset, onRerun, onOpenSchedules }) {
   // ticks once a second while the run is live; elapsed is derived from it
   const [now, setNow] = useState(() => Date.now());
 
@@ -88,6 +88,14 @@ export default function RunProgress({ jobId, status, onReset, onRerun }) {
             {isFailed
               ? status.error
               : `Run ${jobId.slice(0, 8)} · ${isFinished ? `finished in ${elapsed}` : elapsed}`}
+            {status.scheduleId && (
+              <>
+                {" · "}
+                <button type="button" className="link-button inline" onClick={onOpenSchedules}>
+                  started by a schedule
+                </button>
+              </>
+            )}
           </p>
         </div>
         <button className="ghost" type="button" onClick={onReset}>

@@ -77,6 +77,7 @@ export const REMOVAL_REASON_LABELS = {
     seniority: 'Seniority level',
     employment_type: 'Employment type',
     per_company_cap: 'Over the per-company limit',
+    already_sent: 'Already sent by this schedule',
 };
 
 export const AGENCY_MODE_LABELS = {

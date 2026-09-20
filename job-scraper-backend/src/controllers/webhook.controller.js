@@ -1,11 +1,12 @@
 import Job from '../models/job.model.js';
+import DeliveredListing from '../models/deliveredListing.model.js';
 import { fetchRunResults } from '../services/apify.service.js';
 import { JOB_STATUS, APIFY_TERMINAL_STATUSES } from '../constants/apifyConstants.js';
 import { AGENCY_MODE, REMOVAL_REASON } from '../constants/filterConstants.js';
 import { DELIVERY_STATE } from '../constants/deliveryConstants.js';
 import { applyRuleFilters, applyPerCompanyCap } from '../services/filter.service.js';
 import { classifyCompanies } from '../services/classification.service.js';
-import { buildPayloads, deliverAll } from '../services/delivery.service.js';
+import { buildPayloads, deliverAll, payloadKey } from '../services/delivery.service.js';
 import { groupByCompany, companyKey, normalizeJob, stripJobFields, countByReason } from '../helpers/jobHelpers.js';
 
 const EVENT_TO_STATUS = {
@@ -175,10 +176,45 @@ const runPipeline = async (job) => {
         }
 
         // ---- DELIVERING ----
-        const payloads = buildPayloads(kept, inputs.deliveryMode, {
+        let payloads = buildPayloads(kept, inputs.deliveryMode, {
             runId: job.jobId,
+            scheduleId: job.scheduleId || null,
             sentAt: new Date().toISOString(),
         });
+
+        // Scheduled runs skip anything this schedule already delivered.
+        if (job.scheduleId && job.skipAlreadySent && payloads.length) {
+            const keys = payloads.map((p) => payloadKey(p, inputs.deliveryMode));
+            const seen = new Set(
+                (await DeliveredListing.find({ scheduleId: job.scheduleId, key: { $in: keys } }).select('key').lean())
+                    .map((row) => row.key)
+            );
+            const fresh = [];
+            payloads.forEach((payload, i) => {
+                if (seen.has(keys[i])) {
+                    removed.push({
+                        companyName: payload.companyName,
+                        title: payload.jobTitle || payload.firstJobTitle || null,
+                        reason: REMOVAL_REASON.ALREADY_SENT,
+                        detail: keys[i],
+                    });
+                } else {
+                    fresh.push(payload);
+                }
+            });
+            payloads = fresh;
+
+            job.removedJobs = removed;
+            job.removedByReason = countByReason(removed);
+            job.markModified('removedJobs');
+            job.markModified('removedByReason');
+            await job.save();
+
+            if (!payloads.length) {
+                await finishEmpty(job, 'Everything that matched was already sent by this schedule earlier. Nothing new to send.');
+                return;
+            }
+        }
 
         job.status = JOB_STATUS.DELIVERING;
         job.delivery = {
@@ -202,6 +238,23 @@ const runPipeline = async (job) => {
         });
 
         const allFailed = outcome.sent === 0 && outcome.failed > 0;
+
+        if (job.scheduleId && outcome.sent > 0) {
+            const failed = new Set(outcome.failedIndexes);
+            const rows = payloads
+                .map((payload, i) => (failed.has(i) ? null : {
+                    scheduleId: job.scheduleId,
+                    key: payloadKey(payload, inputs.deliveryMode),
+                    jobId: job.jobId,
+                    sentAt: new Date(),
+                }))
+                .filter(Boolean);
+            if (rows.length) {
+                await DeliveredListing.insertMany(rows, { ordered: false }).catch(() => {
+                    /* duplicates from an earlier run are fine */
+                });
+            }
+        }
 
         await Job.updateOne(
             { jobId: job.jobId },

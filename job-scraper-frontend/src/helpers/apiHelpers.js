@@ -69,3 +69,22 @@ export const fetchJobStatus = (jobId) => request(`/job-status/${jobId}`);
 // Sends one sample row to the webhook so the receiver can set up columns.
 export const sendTestRow = (webhookUrl, deliveryMode) =>
     request('/test-webhook', { method: 'POST', body: JSON.stringify({ webhookUrl, deliveryMode }) });
+
+// ---- schedules ------------------------------------------------------------
+
+export const listSchedules = () => request('/schedules');
+
+export const createSchedule = (payload) =>
+    request('/schedules', { method: 'POST', body: JSON.stringify(payload) });
+
+export const updateSchedule = (scheduleId, payload) =>
+    request(`/schedules/${scheduleId}`, { method: 'PATCH', body: JSON.stringify(payload) });
+
+export const deleteSchedule = (scheduleId) =>
+    request(`/schedules/${scheduleId}`, { method: 'DELETE' });
+
+export const runScheduleNow = (scheduleId) =>
+    request(`/schedules/${scheduleId}/run`, { method: 'POST' });
+
+export const resetScheduleSent = (scheduleId) =>
+    request(`/schedules/${scheduleId}/reset-sent`, { method: 'POST' });

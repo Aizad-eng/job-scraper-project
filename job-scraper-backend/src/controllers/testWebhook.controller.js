@@ -1,5 +1,5 @@
 import { buildSamplePayload, postOnce } from '../services/delivery.service.js';
-import { isValidWebhookUrl } from './scrape.controller.js';
+import { isValidWebhookUrl } from '../services/search.service.js';
 import { DELIVERY_MODE, DEFAULT_DELIVERY_MODE } from '../constants/deliveryConstants.js';
 
 // Sends ONE sample record so the receiver (Clay, Sheets, Zapier…) can build

@@ -735,3 +735,194 @@ details[open] summary::before {
     flex-direction: column;
   }
 }
+
+/* ---- top navigation ------------------------------------------------- */
+
+.topnav {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 16px;
+  padding: 4px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  width: fit-content;
+}
+.topnav button {
+  border: 0;
+  background: none;
+  padding: 7px 14px;
+  border-radius: 4px;
+  font: inherit;
+  font-weight: 500;
+  color: var(--ink-soft);
+  cursor: pointer;
+}
+.topnav button.is-on {
+  background: var(--signal-soft);
+  color: var(--signal);
+}
+
+/* ---- schedule fields in the form ----------------------------------- */
+
+.option-list.horizontal {
+  grid-template-columns: 1fr 1fr;
+}
+.schedule-fields {
+  margin-top: 0;
+}
+.optional {
+  font-style: normal;
+  font-weight: 400;
+  font-size: 13px;
+  color: var(--ink-soft);
+  margin-left: 4px;
+}
+.static-value {
+  margin: 0;
+  padding: 9px 11px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--ink-soft);
+}
+.link-button.inline {
+  font-weight: 400;
+  color: var(--signal);
+}
+.link-button.small,
+.primary.small,
+.ghost.small {
+  padding: 7px 14px;
+  font-size: 14px;
+}
+.ghost.danger:hover {
+  color: var(--danger);
+  border-color: var(--danger);
+}
+
+.banner-ok {
+  padding: 10px 12px;
+  background: var(--ok-soft);
+  border: 1px solid #b7e4c7;
+  border-radius: var(--radius);
+  color: var(--ok);
+  font-size: 14px;
+  margin: 0 0 18px;
+}
+
+.empty-state {
+  padding: 28px 0 8px;
+  text-align: center;
+}
+.empty-state p {
+  margin: 0 0 6px;
+}
+
+/* ---- schedules list ------------------------------------------------- */
+
+.schedule-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 14px;
+}
+.schedule {
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 18px 20px;
+}
+.schedule.is-paused {
+  background: var(--page);
+}
+.schedule-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+.schedule-head h2 {
+  font-size: 17px;
+  font-weight: 600;
+  margin: 0 0 2px;
+}
+.schedule-sub {
+  margin: 0;
+  font-size: 13px;
+  color: var(--ink-soft);
+}
+.schedule-meta {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px 20px;
+  margin: 0 0 14px;
+}
+.schedule-meta dt {
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--ink-soft);
+  margin-bottom: 1px;
+}
+.schedule-meta dd {
+  margin: 0;
+  font-weight: 500;
+  font-size: 14px;
+}
+.schedule-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+.schedule-runs {
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
+}
+.schedule-runs summary {
+  font-size: 14px;
+}
+.schedule-runs ul {
+  list-style: none;
+  margin: 8px 0 0;
+  padding: 0;
+}
+.run-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr auto;
+  gap: 12px;
+  align-items: center;
+  width: 100%;
+  padding: 8px 10px;
+  border: 0;
+  border-radius: 4px;
+  background: none;
+  font: inherit;
+  font-size: 14px;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.run-row:hover {
+  background: var(--page);
+}
+
+@media (max-width: 600px) {
+  .option-list.horizontal,
+  .schedule-meta {
+    grid-template-columns: 1fr;
+  }
+  .run-row {
+    grid-template-columns: 1fr;
+    gap: 2px;
+  }
+  .topnav {
+    width: 100%;
+  }
+  .topnav button {
+    flex: 1;
+  }
+}
