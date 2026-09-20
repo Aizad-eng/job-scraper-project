@@ -6,7 +6,9 @@ export const DELIVERY_MODE = {
 
 export const DEFAULT_DELIVERY_MODE = DELIVERY_MODE.JOB;
 
-// Clay and most webhook receivers are happy at a few requests a second.
+// Clay's webhook source accepts 5 requests per second. Requests are spaced
+// so the whole worker pool never exceeds that, regardless of concurrency.
+export const DELIVERY_MAX_PER_SECOND = 5;
 export const DELIVERY_CONCURRENCY = 4;
 export const DELIVERY_TIMEOUT_MS = 15_000;
 export const DELIVERY_MAX_ATTEMPTS = 4;

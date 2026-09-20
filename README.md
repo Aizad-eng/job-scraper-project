@@ -172,7 +172,7 @@ One row per **company** carries the same company fields plus `openRolesFound`, `
 
 `isStaffingAgency` is `true`/`false` when the AI check ran, `false` after the word screen only, and `null` when agency checks are off.
 
-Delivery runs four requests at a time, waits 15 s per request, and retries 429 / 5xx / network errors up to four times with backoff (honouring `Retry-After`). A run is marked failed only if **every** request was rejected; partial failures are reported with the last error.
+Delivery is capped at 5 requests per second (Clay's webhook limit), waits 15 s per request, and retries 429 / 5xx / network errors up to four times with backoff (honouring `Retry-After`). A run is marked failed only if **every** request was rejected; partial failures are reported with the last error.
 
 ---
 

@@ -2,6 +2,7 @@ import axios from 'axios';
 import {
     DELIVERY_MODE,
     DELIVERY_CONCURRENCY,
+    DELIVERY_MAX_PER_SECOND,
     DELIVERY_TIMEOUT_MS,
     DELIVERY_MAX_ATTEMPTS,
     DELIVERY_RETRY_BASE_MS,
@@ -135,12 +136,26 @@ const isRetryable = (error) => {
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
-export const postOnce = (url, payload) =>
-    axios.post(url, payload, {
+// Global spacing between requests: at most DELIVERY_MAX_PER_SECOND per second
+// across all workers, retries included.
+const MIN_GAP_MS = Math.ceil(1000 / DELIVERY_MAX_PER_SECOND);
+let nextSlotAt = 0;
+
+const waitForSlot = async () => {
+    const now = Date.now();
+    const slot = Math.max(now, nextSlotAt);
+    nextSlotAt = slot + MIN_GAP_MS;
+    if (slot > now) await sleep(slot - now);
+};
+
+export const postOnce = async (url, payload) => {
+    await waitForSlot();
+    return axios.post(url, payload, {
         timeout: DELIVERY_TIMEOUT_MS,
         headers: { 'Content-Type': 'application/json' },
         maxRedirects: 0,
     });
+};
 
 export const postWithRetry = async (url, payload) => {
     let lastError;
