@@ -80,6 +80,7 @@ export const REMOVAL_REASON_LABELS = {
     already_sent: 'Already sent by this schedule',
     known_agency: 'Known staffing agency (company memory)',
     company_cooldown: 'Company sent recently (cooldown)',
+    duplicate_listing: 'Duplicate listing in this run',
 };
 
 export const AGENCY_MODE_LABELS = {

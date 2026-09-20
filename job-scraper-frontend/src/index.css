@@ -1030,3 +1030,9 @@ details[open] summary::before {
 .company-sent .link-button {
   font-size: 13px;
 }
+
+.domain-note {
+  font-size: 13px;
+  padding: 10px 0 14px;
+  border-top: 1px solid var(--line);
+}

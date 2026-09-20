@@ -194,6 +194,7 @@ export const groupByCompany = (jobs) => {
                 companyFounded: job.companyFounded,
                 companyLinkedinUrl: job.companyLinkedinUrl,
                 companyProfileUrl: job.companyProfileUrl,
+                companyDomainSource: job.companyDomainSource,
                 jobs: [],
             });
         }
@@ -209,3 +210,41 @@ export const countByReason = (removed) =>
         acc[item.reason] = (acc[item.reason] || 0) + 1;
         return acc;
     }, {});
+
+const normalizeTitle = (title) =>
+    String(title || '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+
+/**
+ * Drops repeated listings inside one run: the same posting returned by two
+ * keyword searches (same board + id/url), and the same title at the same
+ * company seen on two boards. First occurrence wins.
+ */
+export const dedupeListings = (jobs) => {
+    const seenIds = new Set();
+    const seenTitles = new Set();
+    const kept = [];
+    const removed = [];
+
+    jobs.forEach((job) => {
+        const idKey = `${job.platform}|${(job.link || job.id || '').toLowerCase().trim()}`;
+        if ((job.link || job.id) && seenIds.has(idKey)) {
+            removed.push({ companyName: job.companyName || null, title: job.title || null, reason: 'duplicate_listing', detail: 'same listing from another search' });
+            return;
+        }
+        if (job.link || job.id) seenIds.add(idKey);
+
+        const company = companyKey(job);
+        const title = normalizeTitle(job.title);
+        if (company && title) {
+            const titleKey = `${company}|${title}`;
+            if (seenTitles.has(titleKey)) {
+                removed.push({ companyName: job.companyName || null, title: job.title || null, reason: 'duplicate_listing', detail: 'same title at this company already kept' });
+                return;
+            }
+            seenTitles.add(titleKey);
+        }
+        kept.push(job);
+    });
+
+    return { kept, removed };
+};

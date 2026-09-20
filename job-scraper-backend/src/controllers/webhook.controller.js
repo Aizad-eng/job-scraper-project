@@ -15,7 +15,8 @@ import {
     payloadCompanyKey,
 } from '../services/company.service.js';
 import { buildPayloads, deliverAll, payloadKey } from '../services/delivery.service.js';
-import { groupByCompany, companyKey, normalizeJob, stripJobFields, countByReason } from '../helpers/jobHelpers.js';
+import { groupByCompany, companyKey, normalizeJob, stripJobFields, countByReason, dedupeListings } from '../helpers/jobHelpers.js';
+import { resolveCompanyDomains } from '../services/domainLookup.service.js';
 
 const EVENT_TO_STATUS = {
     'ACTOR.RUN.SUCCEEDED': 'SUCCEEDED',
@@ -109,12 +110,36 @@ const runPipeline = async (job) => {
             return;
         }
 
-        // ---- FILTERING ----
-        const rules = applyRuleFilters(job.scrapedJobs, inputs);
-        let kept = rules.kept;
-        const removed = [...rules.removed];
+        // ---- DEDUPE LISTINGS ----
+        // Several keyword searches and two boards overlap; keep each listing once.
+        const deduped = dedupeListings(job.scrapedJobs);
+        const removed = [...deduped.removed];
 
-        console.log(`Job ${job.jobId}: ${job.scrapedJobs.length} scraped, ${kept.length} kept after rules`);
+        // ---- FILTERING ----
+        const rules = applyRuleFilters(deduped.kept, inputs);
+        let kept = rules.kept;
+        removed.push(...rules.removed);
+
+        console.log(
+            `Job ${job.jobId}: ${job.scrapedJobs.length} scraped, ${deduped.removed.length} duplicates, ` +
+            `${kept.length} kept after rules`
+        );
+
+        // ---- DOMAINS ----
+        // Drop shorteners / social / job-board "domains", then find missing ones.
+        try {
+            const domainStats = await resolveCompanyDomains(kept, { lookup: inputs.findMissingDomains !== false });
+            job.domainStats = domainStats;
+            job.markModified('domainStats');
+            console.log(`Job ${job.jobId}: domains — ${JSON.stringify(domainStats)}`);
+        } catch (error) {
+            console.error(`Job ${job.jobId}: domain resolution failed:`, error.message);
+        }
+
+        // A found domain may merge two companies that looked different by name.
+        const redup = dedupeListings(kept);
+        kept = redup.kept;
+        removed.push(...redup.removed);
 
         // ---- COMPANY MEMORY ----
         // Every company we see is recorded, whatever the agency setting.

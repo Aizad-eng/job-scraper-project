@@ -66,6 +66,10 @@ These are only called when "Staffing agencies" is set to *Remove agencies* or *K
 
 **Company memory.** Every company that gets past the rule filters is recorded in a `companies` collection (one document per domain) with what the job board said about it, how often it has appeared, and the check result. Before spending a check, the pipeline looks the company up: a known staffing agency is skipped forever (reported as *Known staffing agency*), a direct-employer verdict is reused for 180 days, an Unknown is retried after 30 days. The **Companies** tab lists everything with search and filters, and lets you mark a company as agency or employer by hand; a hand-set value always wins and is never re-checked. *Word screen only* also uses memory (it is free), it just never calls the paid check.
 
+**Duplicates inside a run.** Every keyword × board scrape is merged first, then the same listing (same board, same URL or ID) is kept once, and the same job title at the same company seen on both boards is kept once. Reported as *Duplicate listing in this run*.
+
+**Domains.** Everything downstream (memory, cooldown, dedupe) keys on the company's registrable domain, normalised. A value from the job board that is a link shortener, social page, job board, ATS, email provider, or that does not resemble the company name is thrown away and counted as missing. With *Find missing company domains* on (default), each company without a usable domain is searched once on Google through ScrapingDog (5 credits) for its official website; the first result that passes the same checks is used, and the answer (found or not) is remembered by company name, so it is never paid for twice. Rows carry `companyDomainSource`: `board`, `found`, `memory`, or `none`. The run page shows how many domains came from where.
+
 **Cooldown.** After delivery, each sent company gets `lastSentAt` on its memory record. Before delivery, any company sent within the search's cooldown window is dropped and reported as *Company sent recently (cooldown)*. This works across one-off runs and all schedules, in both row modes.
 
 **How the company check decides.** For each unique company with a website: ScrapingDog asks Google AI Mode to visit the site and answer `is_recruitment_firm: Yes / No / Unknown` with an industry and a 2–3 sentence description. If the answer is clean JSON it is used as-is. If it comes back as prose or fenced text, Claude (`claude-opus-5`, structured output) converts it into the same record. `Yes` removes (or flags) the company, `No` keeps it, `Unknown` keeps it undecided. If ScrapingDog is not configured, errors (for example out of credits), or gives nothing usable, the old GPT / Perplexity classifiers run when their keys are set; otherwise the company is kept. Every row carries `aiIndustry`, `aiSummary` and `aiSource` from whichever check ran.
@@ -219,7 +223,8 @@ job-scraper-backend/
 │   ├── filterConstants.js          Size bands, staffing words, agency modes, removal reasons
 │   ├── aiConstants.js              Models, ScrapingDog / Claude prompts, batch sizes
 │   ├── deliveryConstants.js        Delivery modes, rate limit, retry policy
-│   ├── companyConstants.js         Verdict lifetimes, list filters
+│   ├── companyConstants.js         Verdict lifetimes, cooldown default, list filters
+│   ├── domainConstants.js          Bad-domain list, lookup settings
 │   └── scheduleConstants.js        Frequencies, tick interval, sent-listing retention
 ├── src/middleware/
 │   ├── auth.js                     Access-key gate and Apify webhook secret
@@ -227,7 +232,8 @@ job-scraper-backend/
 ├── src/models/
 │   ├── job.model.js                The Job document — inputs, results, delivery stats
 │   ├── schedule.model.js           A saved search with its timing and last-run info
-│   ├── company.model.js            Company memory: what we know, verdict, override, seen counts
+│   ├── company.model.js            Company memory: what we know, verdict, override, seen / sent
+│   ├── domainLookup.model.js       Google domain lookups by company name
 │   └── deliveredListing.model.js   What each schedule has already sent (TTL 120 days)
 ├── src/routes/
 │   ├── scrape.routes.js            POST /scrape, GET /job-status/:id, POST /test-webhook
@@ -245,14 +251,16 @@ job-scraper-backend/
 │   ├── scheduler.service.js        30-second tick that starts due schedules
 │   ├── apify.service.js            Triggers actors, fetches results (paginated)
 │   ├── filter.service.js           Rule filters and per-company cap
-│   ├── company.service.js          Record companies seen, reuse known verdicts, save new ones
+│   ├── company.service.js          Record companies seen, verdicts, cooldown
+│   ├── domainLookup.service.js     Clean board domains, find missing ones via Google
 │   ├── scrapingdog.service.js      Google AI Mode call + answer parsing
 │   ├── claude.service.js           Structured-output cleanup of loose answers
 │   ├── ai.service.js               GPT and Perplexity fallbacks
 │   ├── classification.service.js   Batched company check with the fallback chain
 │   └── delivery.service.js         Payload shapes, rate-limited retrying POSTs
 └── src/helpers/
-    ├── jobHelpers.js               Platform normalising, size parsing, word matching
+    ├── jobHelpers.js               Platform normalising, size parsing, word matching, dedupe
+    ├── domainHelpers.js            Bad-domain screen, name ↔ domain matching
     └── scheduleHelpers.js          Timezone math, next-run calculation
 
 job-scraper-frontend/src/

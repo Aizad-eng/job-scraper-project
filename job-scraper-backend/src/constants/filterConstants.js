@@ -50,6 +50,7 @@ export const REMOVAL_REASON = {
     ALREADY_SENT: 'already_sent',
     KNOWN_AGENCY: 'known_agency',
     COMPANY_COOLDOWN: 'company_cooldown',
+    DUPLICATE_LISTING: 'duplicate_listing',
 };
 
 export const REMOVAL_REASON_LABELS = {
@@ -67,6 +68,7 @@ export const REMOVAL_REASON_LABELS = {
     already_sent: 'Already sent by this schedule',
     known_agency: 'Known staffing agency (company memory)',
     company_cooldown: 'Company sent recently (cooldown)',
+    duplicate_listing: 'Duplicate listing in this run',
 };
 
 export const STRIPPED_JOB_FIELDS = [

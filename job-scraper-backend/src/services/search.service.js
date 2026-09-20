@@ -51,6 +51,7 @@ export const parseInputs = (body = {}) => {
 
         webhookUrl: String(body.webhookUrl || '').trim(),
         deliveryMode: oneOf(body.deliveryMode, Object.values(DELIVERY_MODE), DEFAULT_DELIVERY_MODE),
+        findMissingDomains: body.findMissingDomains !== false,
         cooldownDays: Math.min(
             Math.max(body.cooldownDays === undefined || body.cooldownDays === null || body.cooldownDays === '' ? DEFAULT_COOLDOWN_DAYS : Number(body.cooldownDays) || 0, 0),
             MAX_COOLDOWN_DAYS

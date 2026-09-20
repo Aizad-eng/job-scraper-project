@@ -39,6 +39,7 @@ const jobSchema = new mongoose.Schema(
             webhookUrl: String,
             deliveryMode: { type: String, default: 'job' },
             cooldownDays: { type: Number, default: 21 },
+            findMissingDomains: { type: Boolean, default: true },
         },
         apifyRuns: [
             {
@@ -54,6 +55,7 @@ const jobSchema = new mongoose.Schema(
         // reason -> count, so the UI can say why rows went away
         removedByReason: { type: Object, default: {} },
         companiesCount: { type: Number, default: 0 },
+        domainStats: { type: Object, default: null },
         delivery: {
             state: { type: String, default: null },
             total: { type: Number, default: 0 },

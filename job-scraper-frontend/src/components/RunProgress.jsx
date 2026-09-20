@@ -174,6 +174,16 @@ export default function RunProgress({ jobId, status, onReset, onRerun, onOpenSch
         </p>
       )}
 
+      {status.domainStats && (status.domainStats.found > 0 || status.domainStats.cleaned > 0 || status.domainStats.fromMemory > 0) && (
+        <p className="muted domain-note">
+          Domains: {status.domainStats.fromBoard} from the boards
+          {status.domainStats.cleaned > 0 && <>, {status.domainStats.cleaned} unusable dropped</>}
+          {status.domainStats.fromMemory > 0 && <>, {status.domainStats.fromMemory} from memory</>}
+          {status.domainStats.found > 0 && <>, {status.domainStats.found} found via Google</>}
+          {status.domainStats.notFound > 0 && <>, {status.domainStats.notFound} not found</>}
+        </p>
+      )}
+
       {removedEntries.length > 0 && (
         <details className="removed" open={isEmpty}>
           <summary>
@@ -281,6 +291,10 @@ export default function RunProgress({ jobId, status, onReset, onRerun, onOpenSch
                 <dd>{status.inputs.employmentTypes.join(", ")}</dd>
               </div>
             )}
+            <div>
+              <dt>Missing domains</dt>
+              <dd>{status.inputs.findMissingDomains === false ? "Not looked up" : "Looked up via Google"}</dd>
+            </div>
             <div>
               <dt>Company cooldown</dt>
               <dd>{status.inputs.cooldownDays > 0 ? `${status.inputs.cooldownDays} days` : "Off"}</dd>

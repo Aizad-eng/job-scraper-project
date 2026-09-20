@@ -368,6 +368,16 @@ export default function SearchForm({
               allLabel="Any"
               compact
             />
+            <label className="check">
+              <input
+                type="checkbox"
+                checked={values.findMissingDomains}
+                onChange={(event) => setField("findMissingDomains", event.target.checked)}
+              />
+              <span>Find missing company domains</span>
+              <em>{FIELD_HINTS.findMissingDomains}</em>
+            </label>
+
             <div className="field narrow">
               <label className="field-label" htmlFor="maxJobsPerCompany">
                 Max listings per company

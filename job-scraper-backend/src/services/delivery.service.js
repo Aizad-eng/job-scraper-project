@@ -38,6 +38,7 @@ const jobFields = (job) => ({
 const companyFields = (source) => ({
     companyName: source.companyName ?? null,
     companyDomain: source.companyDomain ?? null,
+    companyDomainSource: source.companyDomainSource ?? null,
     companyWebsite: source.companyWebsite ?? null,
     companyLinkedinUrl: source.companyLinkedinUrl ?? null,
     // LinkedIn company page or Indeed company page, whichever board it came from
@@ -123,6 +124,7 @@ export const buildSamplePayload = (mode, meta = {}) => {
         searchKeyword: 'software engineer',
         companyName: 'Example Co',
         companyDomain: 'example.com',
+        companyDomainSource: 'board',
         companyWebsite: 'https://www.example.com/',
         companyLinkedinUrl: 'https://www.linkedin.com/company/example-co',
         companyProfileUrl: 'https://www.linkedin.com/company/example-co',
