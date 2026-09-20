@@ -1,16 +1,19 @@
 import Job from '../models/job.model.js';
 import { fetchRunResults } from '../services/apify.service.js';
 import { JOB_STATUS, APIFY_TERMINAL_STATUSES } from '../constants/apifyConstants.js';
-import { applyRuleFilters } from '../services/filter.service.js';
+import { AGENCY_MODE, REMOVAL_REASON } from '../constants/filterConstants.js';
+import { DELIVERY_STATE } from '../constants/deliveryConstants.js';
+import { applyRuleFilters, applyPerCompanyCap } from '../services/filter.service.js';
 import { classifyCompanies } from '../services/classification.service.js';
-import { groupByCompany, normalizeJob, stripJobFields } from '../helpers/jobHelpers.js';
-import {
-    resolveCompanies,
-    searchCandidates,
-    selectContacts,
-    startContactExport,
-    enrichWithPhones,
-} from '../services/contactLookup.service.js';
+import { buildPayloads, deliverAll } from '../services/delivery.service.js';
+import { groupByCompany, companyKey, normalizeJob, stripJobFields, countByReason } from '../helpers/jobHelpers.js';
+
+const EVENT_TO_STATUS = {
+    'ACTOR.RUN.SUCCEEDED': 'SUCCEEDED',
+    'ACTOR.RUN.FAILED': 'FAILED',
+    'ACTOR.RUN.ABORTED': 'ABORTED',
+    'ACTOR.RUN.TIMED_OUT': 'TIMED-OUT',
+};
 
 export const handleApifyWebhook = async (req, res) => {
     res.status(200).send('OK');
@@ -26,32 +29,31 @@ export const handleApifyWebhook = async (req, res) => {
             return;
         }
 
-        // ---- FIX 3: atomic update, no version conflict ----
-        if (eventType === 'ACTOR.RUN.SUCCEEDED') {
+        const runStatus = EVENT_TO_STATUS[eventType];
+        if (!runStatus) return;
+
+        if (runStatus === 'SUCCEEDED') {
             const run = job.apifyRuns.find((r) => r.runId === runId);
             const results = await fetchRunResults(runId);
             console.log(`Run ${runId} finished with ${results.length} jobs`);
 
-            // if (run.platform === 'indeed' && results.length) {
-            //     console.log('RAW INDEED KEYS:', Object.keys(results[0]));
-            // }
-
+            // atomic update, no version conflict between parallel callbacks
             await Job.updateOne(
                 { jobId: job.jobId, 'apifyRuns.runId': runId },
                 {
                     $set: { 'apifyRuns.$.status': 'SUCCEEDED' },
                     $push: {
                         scrapedJobs: {
-                            $each: results.map((item) => stripJobFields(normalizeJob(item, run.platform))),
+                            $each: results.map((item) => stripJobFields(normalizeJob(item, run.platform, run.keyword))),
                         },
                     },
                 }
             );
-        } else if (eventType === 'ACTOR.RUN.FAILED') {
-            console.warn(`Run ${runId} failed`);
+        } else {
+            console.warn(`Run ${runId} ended with ${runStatus}`);
             await Job.updateOne(
                 { jobId: job.jobId, 'apifyRuns.runId': runId },
-                { $set: { 'apifyRuns.$.status': 'FAILED' } }
+                { $set: { 'apifyRuns.$.status': runStatus } }
             );
         }
 
@@ -64,7 +66,7 @@ export const handleApifyWebhook = async (req, res) => {
 
         if (!allDone) return;
 
-        // ---- FIX 2: only one webhook may claim the pipeline ----
+        // only one webhook may claim the pipeline
         const claimed = await Job.findOneAndUpdate(
             { jobId: refreshed.jobId, status: JOB_STATUS.SCRAPING },
             { $set: { status: JOB_STATUS.FILTERING } },
@@ -82,131 +84,146 @@ export const handleApifyWebhook = async (req, res) => {
     }
 };
 
-// everything after scraping, extracted into its own function
+const finishEmpty = async (job, reason) => {
+    job.status = JOB_STATUS.EMPTY;
+    job.emptyReason = reason;
+    await job.save();
+};
+
+// everything after scraping
 const runPipeline = async (job) => {
     try {
-        // ---- FILTERING ----
-        const { kept, removed } = applyRuleFilters(job.scrapedJobs, {
-            employeeCountMin: job.inputs.employeeCountMin,
-            employeeCountMax: job.inputs.employeeCountMax,
-            filterKeywords: job.inputs.filterKeywords,
-            filterMatchIn: job.inputs.filterMatchIn,
-        });
+        const { inputs } = job;
 
-        job.filteredJobs = kept;
-        job.removedJobs = removed;
-        job.markModified('filteredJobs');
-        job.markModified('removedJobs');
-        await job.save();
+        if (!job.scrapedJobs.length) {
+            await finishEmpty(job, 'The job boards returned no listings for this search. Try broader titles or a wider date window.');
+            return;
+        }
+
+        // ---- FILTERING ----
+        const rules = applyRuleFilters(job.scrapedJobs, inputs);
+        let kept = rules.kept;
+        const removed = [...rules.removed];
 
         console.log(`Job ${job.jobId}: ${job.scrapedJobs.length} scraped, ${kept.length} kept after rules`);
 
-        if (!kept.length) {
-            job.status = JOB_STATUS.EMPTY;
-            job.emptyReason = 'No companies matched your filters. Try widening the employee-count range.';
-            await job.save();
-            return;
-        }
-
         // ---- CLASSIFYING ----
-        job.status = JOB_STATUS.CLASSIFYING;
-        await job.save();
+        const useAi = inputs.agencyMode === AGENCY_MODE.FLAG || inputs.agencyMode === AGENCY_MODE.REMOVE;
 
-        const companies = groupByCompany(kept);
-        console.log(`Classifying ${companies.length} unique companies...`);
-
-        const { kept: cleanCompanies, removed: aiRemoved } = await classifyCompanies(companies);
-
-        job.cleanedCompanies = cleanCompanies;
-        job.removedJobs.push(...aiRemoved);
-        job.markModified('cleanedCompanies');
-        job.markModified('removedJobs');
-        await job.save();
-
-        console.log(`After AI: ${cleanCompanies.length} companies kept, ${aiRemoved.length} flagged as agencies`);
-
-        // ---- FINDING CONTACTS ----
-        job.status = JOB_STATUS.FINDING_CONTACTS;
-        await job.save();
-
-        const { companyIds } = await resolveCompanies(cleanCompanies);
-        console.log(`Resolved ${companyIds.length} of ${cleanCompanies.length} companies in AI-Ark`);
-
-        if (!companyIds.length) {
-            job.status = JOB_STATUS.EMPTY;                                    // ← was READY
-            job.emptyReason = 'Companies were found, but none matched in the contact database.';  // ← add
+        if (useAi && kept.length) {
+            job.status = JOB_STATUS.CLASSIFYING;
+            job.filteredJobs = kept;
+            job.removedJobs = removed;
+            job.removedByReason = countByReason(removed);
+            job.markModified('filteredJobs');
+            job.markModified('removedJobs');
+            job.markModified('removedByReason');
             await job.save();
+
+            const companies = groupByCompany(kept);
+            console.log(`Classifying ${companies.length} unique companies...`);
+            const verdicts = await classifyCompanies(companies);
+
+            const next = [];
+            kept.forEach((item) => {
+                const verdict = verdicts.get(companyKey(item));
+                const annotated = {
+                    ...item,
+                    isStaffingAgency: verdict ? Boolean(verdict.isStaffingAgency) : null,
+                    agencyReason: verdict ? `${verdict.source}: ${verdict.reason}` : null,
+                };
+
+                if (inputs.agencyMode === AGENCY_MODE.REMOVE && annotated.isStaffingAgency) {
+                    removed.push({
+                        companyName: item.companyName,
+                        title: item.title,
+                        reason: REMOVAL_REASON.AI_AGENCY,
+                        detail: annotated.agencyReason,
+                    });
+                    return;
+                }
+                next.push(annotated);
+            });
+            kept = next;
+
+            console.log(`After AI: ${kept.length} jobs kept`);
+        } else {
+            kept = kept.map((item) => ({
+                ...item,
+                isStaffingAgency: inputs.agencyMode === AGENCY_MODE.KEYWORDS ? false : null,
+                agencyReason: inputs.agencyMode === AGENCY_MODE.KEYWORDS ? 'Passed the staffing-word screen' : null,
+            }));
+        }
+
+        // ---- PER-COMPANY CAP ----
+        const capped = applyPerCompanyCap(kept, inputs.maxJobsPerCompany);
+        kept = capped.kept;
+        removed.push(...capped.removed);
+
+        job.filteredJobs = kept;
+        job.removedJobs = removed;
+        job.removedByReason = countByReason(removed);
+        job.companiesCount = groupByCompany(kept).length;
+        job.markModified('filteredJobs');
+        job.markModified('removedJobs');
+        job.markModified('removedByReason');
+        await job.save();
+
+        if (!kept.length) {
+            await finishEmpty(job, 'Every listing was removed by your filters. Loosen the company size or word filters and try again.');
             return;
         }
 
-        // ---- FREE SEARCH FIRST ----
-        // AI-Ark charges per record an export delivers, not per search. So we
-        // look at who exists for free, pick who we want, and only pay for those.
-        const candidates = await searchCandidates({
-            companyIds,
-            personaTitles: job.inputs.personaTitles,
+        // ---- DELIVERING ----
+        const payloads = buildPayloads(kept, inputs.deliveryMode, {
+            runId: job.jobId,
+            sentAt: new Date().toISOString(),
         });
 
-        const { selected, stats } = selectContacts(candidates);
+        job.status = JOB_STATUS.DELIVERING;
+        job.delivery = {
+            state: DELIVERY_STATE.SENDING,
+            total: payloads.length,
+            sent: 0,
+            failed: 0,
+            lastError: null,
+            finishedAt: null,
+        };
+        job.markModified('delivery');
+        await job.save();
 
-        console.log(
-            `Job ${job.jobId}: people search found ${stats.found}, ` +
-            `${stats.droppedNoCompany} had no company, ${stats.droppedOverCap} over the per-company cap, ` +
-            `${stats.selected} selected`
+        console.log(`Job ${job.jobId}: sending ${payloads.length} ${inputs.deliveryMode} records to webhook`);
+
+        const outcome = await deliverAll(inputs.webhookUrl, payloads, async ({ sent, failed, lastError }) => {
+            await Job.updateOne(
+                { jobId: job.jobId },
+                { $set: { 'delivery.sent': sent, 'delivery.failed': failed, 'delivery.lastError': lastError } }
+            );
+        });
+
+        const allFailed = outcome.sent === 0 && outcome.failed > 0;
+
+        await Job.updateOne(
+            { jobId: job.jobId },
+            {
+                $set: {
+                    status: allFailed ? JOB_STATUS.FAILED : JOB_STATUS.DONE,
+                    error: allFailed ? `The webhook rejected every request. Last error: ${outcome.lastError}` : null,
+                    'delivery.state': allFailed ? DELIVERY_STATE.FAILED : DELIVERY_STATE.DONE,
+                    'delivery.sent': outcome.sent,
+                    'delivery.failed': outcome.failed,
+                    'delivery.lastError': outcome.lastError,
+                    'delivery.finishedAt': new Date(),
+                },
+            }
         );
 
-        job.contactStats = stats;
-        job.markModified('contactStats');
-        await job.save();
-
-        if (!selected.length) {
-            job.status = JOB_STATUS.EMPTY;
-            job.emptyReason =
-                'Companies were found, but nobody at them matched your persona titles. Try broadening the titles.';
-            await job.save();
-            return;
-        }
-
-        if (job.inputs.needEmail) {
-            // Pay for exactly the people we selected, not three times as many.
-            const exportJob = await startContactExport({
-                companyIds,
-                personaTitles: job.inputs.personaTitles,
-                size: selected.length,
-                webhookUrl: `${process.env.PUBLIC_BASE_URL}/api/aiark-webhook?s=${process.env.WEBHOOK_SECRET}`,
-            });
-
-            job.aiArkExport = {
-                trackId: exportJob.trackId,
-                state: exportJob.state,
-                requestedSize: selected.length,
-            };
-            job.markModified('aiArkExport');
-            await job.save();
-
-            console.log(
-                `AI-Ark export started: ${exportJob.trackId} for ${selected.length} people ` +
-                `(was ${companyIds.length * 2 * 3} under the old sizing)`
-            );
-            // pipeline resumes in the AI-Ark webhook
-        } else {
-            let contacts = selected;
-
-            if (job.inputs.needPhone) {
-                contacts = await enrichWithPhones(contacts);
-            }
-
-            job.contacts = contacts;
-            job.status = JOB_STATUS.READY;
-            job.markModified('contacts');
-            await job.save();
-
-            console.log(`Found ${contacts.length} contacts`);
-        }
+        console.log(`Job ${job.jobId}: delivered ${outcome.sent}, failed ${outcome.failed}`);
     } catch (error) {
         console.error(`Pipeline failed for job ${job.jobId}:`, error.message);
-        job.status = JOB_STATUS.FAILED;
-        job.error = error.message;
-        await job.save();
+        await Job.updateOne(
+            { jobId: job.jobId },
+            { $set: { status: JOB_STATUS.FAILED, error: error.message } }
+        );
     }
 };

@@ -66,7 +66,6 @@ export const startScrape = (payload) =>
 
 export const fetchJobStatus = (jobId) => request(`/job-status/${jobId}`);
 
-// A download is a plain link, so it can't send a header — the key rides
-// along in the query string instead.
-export const buildDownloadUrl = (jobId, format) =>
-    `${API_BASE_URL}/download/${jobId}?format=${format}&key=${encodeURIComponent(getAccessKey())}`;
+// Sends one sample row to the webhook so the receiver can set up columns.
+export const sendTestRow = (webhookUrl, deliveryMode) =>
+    request('/test-webhook', { method: 'POST', body: JSON.stringify({ webhookUrl, deliveryMode }) });

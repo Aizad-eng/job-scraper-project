@@ -9,7 +9,7 @@ const safeEqual = (a, b) => {
 };
 
 /**
- * Gate for everything a human triggers (scrape / status / download).
+ * Gate for everything a human triggers (scrape / status / test-webhook).
  * Accepts the key in the `x-access-key` header, or as `?key=` for plain
  * browser navigations like the download links (an <a href> can't set headers).
  */
@@ -38,7 +38,7 @@ export const requireAccessKey = (req, res, next) => {
 };
 
 /**
- * Gate for the Apify / AI-Ark webhooks. These are called by machines, not
+ * Gate for the Apify webhook. These are called by machines, not
  * people, so they get their own secret passed in the callback URL.
  */
 export const requireWebhookSecret = (req, res, next) => {

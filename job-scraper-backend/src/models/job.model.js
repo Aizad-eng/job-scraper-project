@@ -10,18 +10,31 @@ const jobSchema = new mongoose.Schema(
             default: JOB_STATUS.PENDING,
         },
         inputs: {
+            // what to search
             keywords: [String],
             location: String,
-            employeeCountMin: Number,
-            employeeCountMax: Number,
-            personaTitles: [String],
             platforms: [String],
             jobsPerKeyword: Number,
-            needEmail: { type: Boolean, default: true },
-            needPhone: { type: Boolean, default: false },
             postedWithin: { type: String, default: 'any' },
+            maxJobsPerCompany: { type: Number, default: 0 },
+
+            // filters
+            companySizes: [String],
+            includeUnknownSize: { type: Boolean, default: false },
             filterKeywords: [String],
             filterMatchIn: [String],
+            excludeWords: [String],
+            excludeMatchIn: [String],
+            includeIndustries: [String],
+            excludeIndustries: [String],
+            excludeCompanies: [String],
+            seniorityLevels: [String],
+            employmentTypes: [String],
+            agencyMode: { type: String, default: 'remove' },
+
+            // where results go
+            webhookUrl: String,
+            deliveryMode: { type: String, default: 'job' },
         },
         apifyRuns: [
             {
@@ -32,30 +45,23 @@ const jobSchema = new mongoose.Schema(
             },
         ],
         scrapedJobs: { type: Array, default: [] },
-        resultFilePath: { type: String, default: null },
         filteredJobs: { type: Array, default: [] },
         removedJobs: { type: Array, default: [] },
-        cleanedCompanies: { type: Array, default: [] },
-        contacts: { type: Array, default: [] },
-        aiArkExport: {
-            trackId: { type: String, default: null },
+        // reason -> count, so the UI can say why rows went away
+        removedByReason: { type: Object, default: {} },
+        companiesCount: { type: Number, default: 0 },
+        delivery: {
             state: { type: String, default: null },
-            // How many records we asked and paid for, and what came back.
-            requestedSize: { type: Number, default: null },
-            reportedTotal: { type: Number, default: null },
-            deliveredCount: { type: Number, default: null },
-        },
-        // Where people went between the free search and the final list.
-        contactStats: {
-            found: { type: Number, default: null },
-            droppedNoCompany: { type: Number, default: null },
-            droppedOverCap: { type: Number, default: null },
-            selected: { type: Number, default: null },
+            total: { type: Number, default: 0 },
+            sent: { type: Number, default: 0 },
+            failed: { type: Number, default: 0 },
+            lastError: { type: String, default: null },
+            finishedAt: { type: Date, default: null },
         },
         error: { type: String, default: null },
         emptyReason: { type: String, default: null },
     },
-    { timestamps: true }
+    { timestamps: true, minimize: false }
 );
 
 export default mongoose.model('Job', jobSchema);

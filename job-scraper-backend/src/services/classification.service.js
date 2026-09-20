@@ -29,19 +29,17 @@ const classifyOne = async (company) => {
     }
 };
 
+// Returns a Map of company key -> classification.
 export const classifyCompanies = async (companies) => {
-    const classified = [];
+    const results = new Map();
 
     // batched parallel — fast, without firing 100 requests at once
     for (let i = 0; i < companies.length; i += AI_BATCH_SIZE) {
         const batch = companies.slice(i, i + AI_BATCH_SIZE);
-        const results = await Promise.all(
-            batch.map(async (company) => ({
-                ...company,
-                classification: await classifyOne(company),
-            }))
+        const classified = await Promise.all(
+            batch.map(async (company) => [company.key, await classifyOne(company)])
         );
-        classified.push(...results);
+        classified.forEach(([key, result]) => results.set(key, result));
 
         // pause between batches to respect rate limits
         if (i + AI_BATCH_SIZE < companies.length) {
@@ -49,14 +47,5 @@ export const classifyCompanies = async (companies) => {
         }
     }
 
-    const kept = classified.filter((c) => !c.classification.isStaffingAgency);
-    const removed = classified
-        .filter((c) => c.classification.isStaffingAgency)
-        .map((c) => ({
-            companyName: c.companyName,
-            reason: 'ai_staffing_agency',
-            detail: `${c.classification.source}: ${c.classification.reason}`,
-        }));
-
-    return { kept, removed };
+    return results;
 };

@@ -11,17 +11,15 @@ import {
  */
 export default function PasswordGate({ children }) {
   const [unlocked, setUnlocked] = useState(false);
-  const [checking, setChecking] = useState(true);
+  // only "checking" on first paint when there is a stored key to verify
+  const [checking, setChecking] = useState(() => Boolean(getAccessKey()));
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
 
   // Re-check any key we already stored, in case it was revoked.
   useEffect(() => {
     const stored = getAccessKey();
-    if (!stored) {
-      setChecking(false);
-      return;
-    }
+    if (!stored) return;
     verifyAccessKey(stored)
       .then((ok) => setUnlocked(ok))
       .catch(() => setUnlocked(false))

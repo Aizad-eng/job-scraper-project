@@ -1,20 +1,30 @@
-import { PIPELINE_STAGES, STAGE_STATE, JOB_STATUS } from '../constants/statusConstants.js';
+import { PIPELINE_STAGES, STAGE_STATE, JOB_STATUS, FINISHED_STATUSES } from '../constants/statusConstants.js';
+
+export const visibleStages = (inputs) =>
+    PIPELINE_STAGES.filter((stage) => !stage.onlyWhen || stage.onlyWhen(inputs));
 
 // where the current status sits in the pipeline
-export const getStageState = (stageStatus, currentStatus) => {
-    const order = PIPELINE_STAGES.map((stage) => stage.status);
+export const getStageState = (stageStatus, currentStatus, stages) => {
+    const order = stages.map((stage) => stage.status);
     const stageIndex = order.indexOf(stageStatus);
-    const currentIndex = order.indexOf(currentStatus);
+
+    // terminal states that are not in the list still mean "everything before is done"
+    const effective =
+        currentStatus === JOB_STATUS.EMPTY ? JOB_STATUS.DELIVERING :
+        currentStatus === JOB_STATUS.FAILED ? currentStatus :
+        currentStatus;
+    const currentIndex = order.indexOf(effective);
 
     if (currentIndex > stageIndex) return STAGE_STATE.DONE;
     if (currentIndex === stageIndex) {
-        return stageStatus === JOB_STATUS.READY ? STAGE_STATE.DONE : STAGE_STATE.ACTIVE;
+        if (stageStatus === JOB_STATUS.DONE) return STAGE_STATE.DONE;
+        if (currentStatus === JOB_STATUS.EMPTY) return STAGE_STATE.WAITING;
+        return STAGE_STATE.ACTIVE;
     }
     return STAGE_STATE.WAITING;
 };
 
-export const isRunning = (status) =>
-    status && status !== JOB_STATUS.READY && status !== JOB_STATUS.FAILED;
+export const isRunning = (status) => Boolean(status) && !FINISHED_STATUSES.includes(status);
 
 export const formatElapsed = (startIso, endIso) => {
     if (!startIso) return '0s';
@@ -27,27 +37,46 @@ export const formatElapsed = (startIso, endIso) => {
     return minutes ? `${minutes}m ${seconds % 60}s` : `${seconds}s`;
 };
 
-export const splitToList = (value) =>
-    value
-        .split(',')
-        .map((item) => item.trim())
-        .filter(Boolean);
+export const formatDate = (iso) => {
+    if (!iso) return '';
+    const date = new Date(iso);
+    return date.toLocaleString(undefined, {
+        month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit',
+    });
+};
+
+export const isValidWebhookUrl = (value) => {
+    try {
+        const url = new URL(String(value || '').trim());
+        return url.protocol === 'https:' || url.protocol === 'http:';
+    } catch {
+        return false;
+    }
+};
 
 export const validateForm = (values) => {
     const errors = {};
 
-    if (!values.keywords.length) errors.keywords = 'Add at least one keyword';
-    if (!values.platforms.length) errors.platforms = 'Pick at least one platform';
-    if (!values.personaTitles.length) errors.personaTitles = 'Add at least one title to search for';
-
-    if (Number(values.employeeCountMin) > Number(values.employeeCountMax)) {
-        errors.employeeCount = 'Minimum is larger than maximum';
-    }
+    if (!values.keywords.length) errors.keywords = 'Add at least one job title';
+    if (!values.platforms.length) errors.platforms = 'Pick at least one job board';
+    if (!isValidWebhookUrl(values.webhookUrl)) errors.webhookUrl = 'Enter a valid URL starting with https://';
 
     if (values.filterKeywords.length && !values.filterMatchIn.length) {
-        errors.filterMatchIn = 'Pick at least one place to look';
+        errors.filterMatchIn = 'Pick where to look';
+    }
+    if (values.excludeWords.length && !values.excludeMatchIn.length) {
+        errors.excludeMatchIn = 'Pick where to look';
     }
 
     return errors;
 };
 
+// "3 titles × 2 boards = 6 scrapes, up to 150 listings"
+export const describeRun = (values) => {
+    const titles = values.keywords.length;
+    const boards = values.platforms.length;
+    if (!titles || !boards) return '';
+    const runs = titles * boards;
+    const listings = runs * Number(values.jobsPerKeyword || 0);
+    return `${titles} ${titles === 1 ? 'title' : 'titles'} × ${boards} ${boards === 1 ? 'board' : 'boards'} = ${runs} ${runs === 1 ? 'scrape' : 'scrapes'}, up to ${listings.toLocaleString()} listings`;
+};

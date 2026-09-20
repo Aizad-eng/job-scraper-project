@@ -14,14 +14,10 @@
   "license": "ISC",
   "description": "",
   "dependencies": {
-    "@ngrok/ngrok": "^1.7.0",
     "axios": "^1.20.0",
-    "cors": "^2.8.6",
     "dotenv": "^17.4.2",
-    "exceljs": "^4.4.0",
     "express": "^5.2.1",
-    "mongoose": "^9.9.4",
-    "uuid": "^14.0.2"
+    "mongoose": "^9.9.4"
   },
   "devDependencies": {
     "nodemon": "^3.1.14"
