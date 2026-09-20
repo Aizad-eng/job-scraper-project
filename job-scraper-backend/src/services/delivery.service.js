@@ -47,6 +47,10 @@ const companyFields = (source) => ({
     companyDescription: source.companyDescription ?? null,
     isStaffingAgency: source.isStaffingAgency ?? null,
     staffingAgencyReason: source.agencyReason ?? null,
+    // from the website check (ScrapingDog / Claude), when it ran
+    aiIndustry: source.aiIndustry ?? null,
+    aiSummary: source.aiSummary ?? null,
+    aiSource: source.aiSource ?? null,
 });
 
 const buildJobPayload = (job, meta) => ({
@@ -125,7 +129,10 @@ export const buildSamplePayload = (mode, meta = {}) => {
         companySpecialties: 'SaaS, Analytics',
         companyDescription: 'Example Co builds analytics software for retailers.',
         isStaffingAgency: false,
-        agencyReason: 'Hires for its own product team',
+        agencyReason: 'scrapingdog: Example Co builds analytics software for retailers and hires for its own team.',
+        aiIndustry: 'Software Development',
+        aiSummary: 'Example Co builds analytics software for retailers and hires for its own team.',
+        aiSource: 'scrapingdog',
     };
 
     return buildPayloads([sampleJob], mode, { ...meta, isTest: true })[0];

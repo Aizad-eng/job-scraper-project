@@ -130,11 +130,15 @@ const runPipeline = async (job) => {
                 const verdict = verdicts.get(companyKey(item));
                 const annotated = {
                     ...item,
-                    isStaffingAgency: verdict ? Boolean(verdict.isStaffingAgency) : null,
+                    // true = agency, false = direct employer, null = could not tell
+                    isStaffingAgency: verdict ? (verdict.isStaffingAgency ?? null) : null,
                     agencyReason: verdict ? `${verdict.source}: ${verdict.reason}` : null,
+                    aiIndustry: verdict?.industry ?? null,
+                    aiSummary: verdict?.summary ?? null,
+                    aiSource: verdict?.source ?? null,
                 };
 
-                if (inputs.agencyMode === AGENCY_MODE.REMOVE && annotated.isStaffingAgency) {
+                if (inputs.agencyMode === AGENCY_MODE.REMOVE && annotated.isStaffingAgency === true) {
                     removed.push({
                         companyName: item.companyName,
                         title: item.title,

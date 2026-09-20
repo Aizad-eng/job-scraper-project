@@ -19,8 +19,9 @@ User submits search
         │              industries, excluded companies, seniority, employment type,
         │              staffing words in the company name / domain / industry
         ▼
-  AI classifier ─────► GPT-4o-mini reads the company description
-        │              Perplexity checks the website when there is no description
+  Company check ─────► Google AI Mode (via ScrapingDog) visits the company website
+        │              and answers "recruitment firm: Yes / No / Unknown" + industry
+        │              Claude turns a messy answer into clean JSON when needed
         │              agencies are removed or flagged, depending on the setting
         ▼
   Webhook ───────────► one POST per job listing, or one per company
@@ -37,7 +38,7 @@ A search can also be saved as a **schedule**: every day, every N days, or chosen
 
 **Backend** — Node.js, Express, MongoDB (Mongoose)
 **Frontend** — React, Vite
-**External services** — Apify, OpenAI, Perplexity
+**External services** — Apify, ScrapingDog (Google AI Mode), Claude; OpenAI and Perplexity as optional fallbacks
 **Hosting** — one Render web service (the backend serves the built frontend), MongoDB Atlas
 
 ---
@@ -48,18 +49,22 @@ A search can also be saved as a **schedule**: every day, every N days, or chosen
 
 - Node.js 18 or newer
 - A MongoDB database (Atlas free tier works)
-- API keys for Apify, OpenAI and Perplexity
+- API keys for Apify, ScrapingDog and Claude (OpenAI and Perplexity optional)
 - [ngrok](https://ngrok.com) for local development — Apify's callback needs a public URL
 
 ### API keys
 
-| Service    | Used for                                   | Where to get it                         |
-| ---------- | ------------------------------------------ | --------------------------------------- |
-| Apify      | Running the job scrapers                   | Console → Settings → API & Integrations |
-| OpenAI     | Classifying companies with descriptions    | platform.openai.com → API keys          |
-| Perplexity | Classifying companies without descriptions | Settings → API                          |
+| Service     | Env var            | Used for                                                        | Where to get it                         |
+| ----------- | ------------------ | --------------------------------------------------------------- | --------------------------------------- |
+| Apify       | `APIFY_TOKEN`      | Running the job scrapers                                        | Console → Settings → API & Integrations |
+| ScrapingDog | `SCRAPPINGDOG_KEY` | Google AI Mode visits each company website (10 credits/company) | scrapingdog.com dashboard               |
+| Claude      | `CLAUDE_KEY`       | Turning a non-JSON AI Mode answer into the strict record        | console.anthropic.com → API keys        |
+| OpenAI      | `OPENAI_API_KEY`   | Optional fallback: classify from the job board's description    | platform.openai.com → API keys          |
+| Perplexity  | `PERPLEXITY_API_KEY` | Optional fallback: classify from the website                  | Settings → API                          |
 
-OpenAI and Perplexity are only called when "Staffing agencies" is set to *Remove agencies* or *Keep but flag*. The *Word screen only* and *Off* settings never call them.
+These are only called when "Staffing agencies" is set to *Remove agencies* or *Keep but flag*. The *Word screen only* and *Off* settings never call them.
+
+**How the company check decides.** For each unique company with a website: ScrapingDog asks Google AI Mode to visit the site and answer `is_recruitment_firm: Yes / No / Unknown` with an industry and a 2–3 sentence description. If the answer is clean JSON it is used as-is. If it comes back as prose or fenced text, Claude (`claude-opus-5`, structured output) converts it into the same record. `Yes` removes (or flags) the company, `No` keeps it, `Unknown` keeps it undecided. If ScrapingDog is not configured, errors (for example out of credits), or gives nothing usable, the old GPT / Perplexity classifiers run when their keys are set; otherwise the company is kept. Every row carries `aiIndustry`, `aiSummary` and `aiSource` from whichever check ran.
 
 ### Backend
 
@@ -77,6 +82,9 @@ WEBHOOK_SECRET=long-random-secret-for-apify-callbacks
 MONGO_URI=mongodb+srv://user:password@cluster.mongodb.net/job-scraper
 
 APIFY_TOKEN=apify_api_...
+SCRAPPINGDOG_KEY=...
+CLAUDE_KEY=sk-ant-...
+# optional fallbacks
 OPENAI_API_KEY=sk-...
 PERPLEXITY_API_KEY=pplx-...
 
@@ -172,7 +180,10 @@ One row per **job listing** (default):
   "companySpecialties": "…",
   "companyDescription": "…",
   "isStaffingAgency": false,
-  "staffingAgencyReason": "gpt: Hires for its own product team",
+  "staffingAgencyReason": "scrapingdog: Example Co builds analytics software for retailers…",
+  "aiIndustry": "Software Development",
+  "aiSummary": "Example Co builds analytics software for retailers…",
+  "aiSource": "scrapingdog",
 
   "runId": "…",
   "scheduleId": "… or null",
@@ -182,7 +193,7 @@ One row per **job listing** (default):
 
 One row per **company** carries the same company fields plus `openRolesFound`, `firstJobTitle`, `firstJobUrl`, `firstJobLocation`, `firstJobPostedAt`, `allJobTitles` (pipe-separated) and a nested `jobs` array.
 
-`isStaffingAgency` is `true`/`false` when the AI check ran, `false` after the word screen only, and `null` when agency checks are off.
+`isStaffingAgency` is `true`/`false` when the company check decided, `null` when it answered Unknown or agency checks are off, and `false` after the word screen only. `aiSource` is `scrapingdog`, `scrapingdog+claude`, `gpt`, `perplexity` or `skipped`.
 
 Delivery is capped at 5 requests per second (Clay's webhook limit), waits 15 s per request, and retries 429 / 5xx / network errors up to four times with backoff (honouring `Retry-After`). A run is marked failed only if **every** request was rejected; partial failures are reported with the last error.
 
@@ -197,7 +208,7 @@ job-scraper-backend/
 ├── src/constants/
 │   ├── apifyConstants.js           Actor IDs, job statuses, posted-within mapping
 │   ├── filterConstants.js          Size bands, staffing words, agency modes, removal reasons
-│   ├── aiConstants.js              Model names, classifier prompt, batch sizes
+│   ├── aiConstants.js              Models, ScrapingDog / Claude prompts, batch sizes
 │   ├── deliveryConstants.js        Delivery modes, rate limit, retry policy
 │   └── scheduleConstants.js        Frequencies, tick interval, sent-listing retention
 ├── src/middleware/
@@ -221,8 +232,10 @@ job-scraper-backend/
 │   ├── scheduler.service.js        30-second tick that starts due schedules
 │   ├── apify.service.js            Triggers actors, fetches results (paginated)
 │   ├── filter.service.js           Rule filters and per-company cap
-│   ├── ai.service.js               GPT and Perplexity calls
-│   ├── classification.service.js   Batched agency classification
+│   ├── scrapingdog.service.js      Google AI Mode call + answer parsing
+│   ├── claude.service.js           Structured-output cleanup of loose answers
+│   ├── ai.service.js               GPT and Perplexity fallbacks
+│   ├── classification.service.js   Batched company check with the fallback chain
 │   └── delivery.service.js         Payload shapes, rate-limited retrying POSTs
 └── src/helpers/
     ├── jobHelpers.js               Platform normalising, size parsing, word matching
