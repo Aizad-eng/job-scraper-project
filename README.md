@@ -154,7 +154,9 @@ The progress page shows each stage with counts, why listings were removed, the s
 
 ### Schedules
 
-The **Schedules** tab lists every saved schedule with its next run, last run, and past runs. From there you can **Run now**, **Pause** / **Resume**, **Edit** (same form, pre-filled), **Delete**, or **Forget sent listings** so the next run sends everything again.
+The **Schedules** tab lists every saved schedule with its next run, last run, and past runs. Each card has an **Active** checkbox to switch it on or off, plus **Run now**, **Edit** (same form, pre-filled), **Delete**, and **Forget sent listings** so the next run sends everything again.
+
+**Bulk changes.** Tick the schedules you want (or *Select all*, *active*, *paused*), then **Activate**, **Deactivate**, **Run now** or **Delete** them together, or **Change settings** to set listings per title, posted-within, staffing-agency mode, row mode, cooldown, keyword spacing, salary range, run time, already-sent handling or the webhook URL on all of them at once. Only the fields you set are changed; everything else on each schedule stays. A schedule that rejects the change (for example an invalid webhook URL) is reported by name and left untouched.
 
 **Keyword spacing.** A schedule can space its keyword searches out: *Minutes between keyword searches* (default 20 for schedules, 0 for one-off runs). The first keyword starts at the scheduled time on every board; each next keyword starts that many minutes later. The queued searches live on the job (`pendingLaunches`) and the same 30-second tick launches them when due, so a restart in between loses nothing. Filtering and delivery happen once, after the last search has finished. The run page shows how many are queued and when the next starts.
 

@@ -3,6 +3,7 @@ import Job from '../models/job.model.js';
 import DeliveredListing from '../models/deliveredListing.model.js';
 import { parseInputs } from '../services/search.service.js';
 import { runSchedule, newScheduleId } from '../services/scheduler.service.js';
+import DeliveredListingModel from '../models/deliveredListing.model.js';
 import {
     computeNextRun,
     describeSchedule,
@@ -176,5 +177,83 @@ export const resetDelivered = async (req, res) => {
         res.json({ success: true, removed: result.deletedCount });
     } catch (error) {
         res.status(500).json({ success: false, error: error.message });
+    }
+};
+
+// ---------------------------------------------------------------------------
+// Bulk operations
+// Body: { scheduleIds: [..] | "all", inputs?: {partial}, schedule?: {partial}, action?: "pause"|"resume"|"run"|"delete" }
+// Only the keys present in `inputs` / `schedule` are changed; everything else
+// on each schedule stays as it is.
+// ---------------------------------------------------------------------------
+
+const selectSchedules = async (scheduleIds) => {
+    if (scheduleIds === 'all') return Schedule.find();
+    if (!Array.isArray(scheduleIds) || !scheduleIds.length) throw new Error('Pick at least one schedule.');
+    return Schedule.find({ scheduleId: { $in: scheduleIds.map(String) } });
+};
+
+const TIMING_KEYS = ['frequency', 'everyDays', 'weekdays', 'runTime', 'timezone'];
+
+export const bulkUpdateSchedules = async (req, res) => {
+    try {
+        const { scheduleIds, inputs: inputPatch, schedule: schedulePatch, action } = req.body || {};
+        const schedules = await selectSchedules(scheduleIds);
+        if (!schedules.length) return res.json({ success: true, updated: 0, failed: [] });
+
+        const failed = [];
+        let updated = 0;
+        const startedJobs = [];
+
+        for (const schedule of schedules) {
+            try {
+                if (action === 'delete') {
+                    await Schedule.deleteOne({ scheduleId: schedule.scheduleId });
+                    await DeliveredListingModel.deleteMany({ scheduleId: schedule.scheduleId });
+                    updated += 1;
+                    continue;
+                }
+
+                if (action === 'run') {
+                    const job = await runSchedule(schedule.toObject(), { manual: true });
+                    startedJobs.push(job.jobId);
+                    updated += 1;
+                    continue;
+                }
+
+                if (inputPatch && typeof inputPatch === 'object' && Object.keys(inputPatch).length) {
+                    // drop keys sent as null/undefined so "leave unchanged" works
+                    const patch = Object.fromEntries(
+                        Object.entries(inputPatch).filter(([, v]) => v !== undefined && v !== '__unchanged__')
+                    );
+                    schedule.inputs = parseInputs({ ...schedule.inputs, ...patch });
+                    schedule.markModified('inputs');
+                }
+
+                const fields = { ...(schedulePatch || {}) };
+                if (action === 'pause') fields.enabled = false;
+                if (action === 'resume') fields.enabled = true;
+
+                if (Object.keys(fields).length) {
+                    const merged = parseScheduleFields({ ...schedule.toObject(), ...fields });
+                    const timingChanged = TIMING_KEYS.some((key) => fields[key] !== undefined) &&
+                        JSON.stringify(TIMING_KEYS.map((k) => merged[k])) !== JSON.stringify(TIMING_KEYS.map((k) => schedule[k]));
+                    Object.assign(schedule, merged);
+                    if (timingChanged || (merged.enabled && !schedule.nextRunAt)) {
+                        schedule.anchorDate = localDateString(new Date(), schedule.timezone);
+                        schedule.nextRunAt = computeNextRun(schedule, new Date());
+                    }
+                }
+
+                await schedule.save();
+                updated += 1;
+            } catch (error) {
+                failed.push({ scheduleId: schedule.scheduleId, name: schedule.name, error: error.message });
+            }
+        }
+
+        res.json({ success: true, updated, failed, startedJobs });
+    } catch (error) {
+        res.status(400).json({ success: false, error: error.message });
     }
 };

@@ -1,10 +1,12 @@
 import { useEffect, useState, useCallback } from "react";
+import BulkEditor from "./BulkEditor.jsx";
 import {
   listSchedules,
   updateSchedule,
   deleteSchedule,
   runScheduleNow,
   resetScheduleSent,
+  bulkUpdateSchedules,
 } from "../helpers/apiHelpers.js";
 import { formatDateTime, formatUntil } from "../helpers/formatHelpers.js";
 import { SCHEDULES_REFRESH_MS } from "../constants/scheduleConstants.js";
@@ -26,6 +28,10 @@ export default function Schedules({ onOpenRun, onEdit, onNew, flash }) {
   const [schedules, setSchedules] = useState(null);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState({});
+  const [selected, setSelected] = useState(() => new Set());
+  const [showBulk, setShowBulk] = useState(false);
+  const [bulkBusy, setBulkBusy] = useState(false);
+  const [notice, setNotice] = useState("");
 
   const load = useCallback(async () => {
     try {
@@ -64,6 +70,53 @@ export default function Schedules({ onOpenRun, onEdit, onNew, flash }) {
       updateSchedule(schedule.scheduleId, { enabled: !schedule.enabled }),
     );
 
+  // ---- selection + bulk ----
+  const ids = (schedules || []).map((s) => s.scheduleId);
+  const allSelected = ids.length > 0 && ids.every((id) => selected.has(id));
+
+  const toggleSelected = (id) =>
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+
+  const selectWhere = (predicate) =>
+    setSelected(new Set((schedules || []).filter(predicate).map((s) => s.scheduleId)));
+
+  const runBulk = async (payload, describe) => {
+    setBulkBusy(true);
+    setError("");
+    try {
+      const result = await bulkUpdateSchedules({ scheduleIds: [...selected], ...payload });
+      const failedNote = result.failed?.length
+        ? ` ${result.failed.length} failed: ${result.failed.map((f) => `${f.name || f.scheduleId.slice(0, 8)} (${f.error})`).join("; ")}`
+        : "";
+      setNotice(`${describe(result.updated)}.${failedNote}`);
+      if (payload.action === "delete") setSelected(new Set());
+      await load();
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setBulkBusy(false);
+    }
+  };
+
+  const bulkAction = (action) => {
+    const n = selected.size;
+    if (!n) return;
+    if (action === "delete" && !window.confirm(`Delete ${n} ${n === 1 ? "schedule" : "schedules"}? Past runs are kept.`)) return;
+    if (action === "run" && !window.confirm(`Start ${n} ${n === 1 ? "search" : "searches"} now?`)) return;
+    const verbs = { pause: "Paused", resume: "Resumed", run: "Started", delete: "Deleted" };
+    runBulk({ action }, (count) => `${verbs[action]} ${count} ${count === 1 ? "schedule" : "schedules"}`);
+  };
+
+  const bulkApply = ({ inputs, schedule }) =>
+    runBulk({ inputs, schedule }, (count) => `Updated ${count} ${count === 1 ? "schedule" : "schedules"}`).then(() =>
+      setShowBulk(false),
+    );
+
   const runNow = (schedule) =>
     withBusy(schedule.scheduleId, async () => {
       const result = await runScheduleNow(schedule.scheduleId);
@@ -93,7 +146,52 @@ export default function Schedules({ onOpenRun, onEdit, onNew, flash }) {
       </header>
 
       {flash && <p className="banner-ok">{flash}</p>}
+      {notice && <p className="banner-ok">{notice}</p>}
       {error && <p className="banner-error">{error}</p>}
+
+      {schedules?.length > 0 && (
+        <div className="bulk-bar">
+          <label className="check">
+            <input
+              type="checkbox"
+              checked={allSelected}
+              onChange={() => (allSelected ? setSelected(new Set()) : selectWhere(() => true))}
+            />
+            <span>{selected.size ? `${selected.size} selected` : "Select all"}</span>
+          </label>
+          <button type="button" className="link-button small" onClick={() => selectWhere((s) => s.enabled)}>
+            active
+          </button>
+          <button type="button" className="link-button small" onClick={() => selectWhere((s) => !s.enabled)}>
+            paused
+          </button>
+          <span className="bulk-spacer" />
+          <button type="button" className="ghost small" disabled={!selected.size || bulkBusy} onClick={() => bulkAction("resume")}>
+            Activate
+          </button>
+          <button type="button" className="ghost small" disabled={!selected.size || bulkBusy} onClick={() => bulkAction("pause")}>
+            Deactivate
+          </button>
+          <button type="button" className="ghost small" disabled={!selected.size || bulkBusy} onClick={() => setShowBulk(true)}>
+            Change settings
+          </button>
+          <button type="button" className="ghost small" disabled={!selected.size || bulkBusy} onClick={() => bulkAction("run")}>
+            Run now
+          </button>
+          <button type="button" className="ghost small danger" disabled={!selected.size || bulkBusy} onClick={() => bulkAction("delete")}>
+            Delete
+          </button>
+        </div>
+      )}
+
+      {showBulk && (
+        <BulkEditor
+          count={selected.size}
+          onApply={bulkApply}
+          onClose={() => setShowBulk(false)}
+          busy={bulkBusy}
+        />
+      )}
 
       {schedules === null && !error && <p className="muted">Loading…</p>}
 
@@ -111,18 +209,32 @@ export default function Schedules({ onOpenRun, onEdit, onNew, flash }) {
           const title = schedule.name || schedule.inputs.keywords?.join(", ");
           const isBusy = Boolean(busy[schedule.scheduleId]);
           return (
-            <li key={schedule.scheduleId} className={`schedule ${schedule.enabled ? "" : "is-paused"}`}>
+            <li key={schedule.scheduleId} className={`schedule ${schedule.enabled ? "" : "is-paused"} ${selected.has(schedule.scheduleId) ? "is-selected" : ""}`}>
               <div className="schedule-head">
-                <div>
+                <label className="select-box" title="Select">
+                  <input
+                    type="checkbox"
+                    checked={selected.has(schedule.scheduleId)}
+                    onChange={() => toggleSelected(schedule.scheduleId)}
+                    aria-label={`Select ${title}`}
+                  />
+                </label>
+                <div className="schedule-title">
                   <h2>{title}</h2>
                   <p className="schedule-sub">
                     {schedule.inputs.keywords?.join(", ")} · {schedule.inputs.location || "Anywhere"} ·{" "}
                     {schedule.inputs.platforms?.join(", ")}
                   </p>
                 </div>
-                <span className={`pill ${schedule.enabled ? "is-done" : ""}`}>
-                  {schedule.enabled ? "Active" : "Paused"}
-                </span>
+                <label className={`active-toggle ${schedule.enabled ? "is-on" : ""}`}>
+                  <input
+                    type="checkbox"
+                    checked={schedule.enabled}
+                    disabled={isBusy}
+                    onChange={() => toggle(schedule)}
+                  />
+                  <span>{schedule.enabled ? "Active" : "Paused"}</span>
+                </label>
               </div>
 
               <dl className="schedule-meta">
@@ -155,9 +267,6 @@ export default function Schedules({ onOpenRun, onEdit, onNew, flash }) {
               <div className="schedule-actions">
                 <button className="primary small" type="button" disabled={isBusy} onClick={() => runNow(schedule)}>
                   Run now
-                </button>
-                <button className="ghost small" type="button" disabled={isBusy} onClick={() => toggle(schedule)}>
-                  {schedule.enabled ? "Pause" : "Resume"}
                 </button>
                 <button className="ghost small" type="button" disabled={isBusy} onClick={() => onEdit(schedule)}>
                   Edit

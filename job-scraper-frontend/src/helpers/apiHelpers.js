@@ -110,3 +110,7 @@ export const setCompanyOverride = (key, isStaffingAgency, note = '') =>
 
 export const allowCompanyAgain = (key) =>
     request(`/companies/${encodeURIComponent(key)}/allow-again`, { method: 'POST' });
+
+// Bulk: { scheduleIds: [..] | "all", inputs?: {partial}, schedule?: {partial}, action?: "pause"|"resume"|"run"|"delete" }
+export const bulkUpdateSchedules = (payload) =>
+    request('/schedules/bulk', { method: 'POST', body: JSON.stringify(payload) });
