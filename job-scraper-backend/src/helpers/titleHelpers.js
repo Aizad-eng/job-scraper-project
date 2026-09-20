@@ -45,6 +45,27 @@ const ABBREVIATIONS = [
 const SMALL_WORDS = new Set(['of', 'and', 'the', 'for', 'to', 'in', 'at', 'on', 'or', 'a', 'an', 'de', 'du']);
 const KEEP_UPPER = new Set(['VP', 'SVP', 'EVP', 'AVP', 'CEO', 'CFO', 'COO', 'CTO', 'CIO', 'CMO', 'CRO', 'CHRO', 'CPO', 'CSO', 'CISO', 'CDO', 'CCO', 'CLO', 'GM', 'HR', 'IT', 'AI', 'ML', 'UX', 'UI', 'QA', 'SEO', 'SEM', 'PR', 'B2B', 'B2C', 'SaaS', 'US', 'UK', 'EMEA', 'APAC', 'M&A', 'FP&A', 'R&D', 'IoT', 'API', 'ERP', 'CRM', 'SAP', 'AWS', 'GCP', 'iOS', 'PhD', 'MD', 'RN', 'CPA', 'PMO', 'EHS', 'HSE', 'QC', 'NPI', 'OEM', 'DevOps', 'SDR', 'BDR', 'AE', 'CSM']);
 
+// "Senior Director, Product" -> "Senior Director of Product"
+// "VP, Sales" -> "VP of Sales"; "Head, People Operations" -> "Head of People Operations"
+const ROLE_WORDS = /\b(director|manager|head|president|vp|svp|evp|avp|officer|lead|partner|controller|chief|counsel|principal|treasurer|executive|gm|engineer|architect|analyst|specialist|coordinator|consultant|scientist|designer|developer|recruiter|administrator|supervisor|associate)\.?$/i;
+const FUNCTION_TAIL_OK = /^[a-z0-9&/+ .'-]{2,40}$/i;
+
+const REGION_WORD = /^(north america|emea|apac|latam|usa?|us|uk|europe|global|remote|hybrid|east|west|central|americas|international|northeast|southeast|midwest|southwest|northwest|canada|mexico)$/i;
+
+export const commaToOf = (text) => {
+    let parts = text.split(',').map((p) => p.trim()).filter(Boolean);
+    // "Executive Director, Enterprise Sales, West" -> drop the trailing region
+    while (parts.length > 2 && REGION_WORD.test(parts[parts.length - 1])) parts = parts.slice(0, -1);
+    if (parts.length !== 2) return parts.join(', ');
+    const [role, fn] = parts;
+    if (!ROLE_WORDS.test(role)) return text;               // "Sales, Marketing Director" stays
+    if (/\bof\b/i.test(role) || /^(of|for|and)\b/i.test(fn)) return text;   // already "X of Y, Z"
+    if (!FUNCTION_TAIL_OK.test(fn)) return text;
+    // regions / modifiers after the comma are not functions
+    if (REGION_WORD.test(fn)) return role;
+    return `${role} of ${fn}`;
+};
+
 export const titleCase = (text) =>
     text
         .split(/\s+/)
@@ -88,6 +109,7 @@ export const cleanTitleWithRules = (raw) => {
     t = t.replace(/\s*,\s*$/, '').replace(/^\s*,\s*/, '');
     ABBREVIATIONS.forEach(([rx, rep]) => { t = t.replace(rx, rep); });
     t = t.replace(/\s{2,}/g, ' ').trim();
+    t = commaToOf(t);
     t = titleCase(t);
 
     const isAcronym = /^[A-Z]{2,5}$/.test(t);

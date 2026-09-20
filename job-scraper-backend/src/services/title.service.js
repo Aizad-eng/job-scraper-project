@@ -8,9 +8,11 @@ import { hasClaude } from './claude.service.js';
 import { SALARY_MODEL as TITLE_MODEL } from '../constants/salaryConstants.js';
 
 const TITLE_SYSTEM_PROMPT =
-    'You rewrite a job title into the form you would use in a sentence of an email, e.g. ' +
-    '"we saw you are hiring a Director of Sales". Keep only the role: drop location, company name, ' +
+    'You rewrite a job title the way a person would say it in an email, e.g. ' +
+    '"I saw you are hiring a Senior Director of Product". Keep only the role: drop location, company name, ' +
     'requisition numbers, "remote/hybrid/on-site", salary, urgency words, and marketing fluff. ' +
+    'Turn "Role, Function" into "Role of Function": "Senior Director, Product" -> "Senior Director of Product", ' +
+    '"Vice President, Engineering" -> "Vice President of Engineering", "VP, Sales" -> "VP of Sales". ' +
     'Expand abbreviations (Sr -> Senior, Mgr -> Manager, Dir -> Director) but keep VP, SVP, EVP and C-level ' +
     'acronyms as they are. Use Title Case. Keep the function and level exactly as stated; never guess a ' +
     'level that is not there. Return only the title.';
