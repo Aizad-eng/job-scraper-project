@@ -116,3 +116,12 @@ export const validateScheduleFields = (fields) => {
     }
     return errors;
 };
+
+// "3 days ago", "today"
+export const formatAgo = (iso) => {
+    if (!iso) return '';
+    const days = Math.floor((Date.now() - new Date(iso).getTime()) / 86400000);
+    if (days <= 0) return 'today';
+    if (days === 1) return 'yesterday';
+    return `${days} days ago`;
+};

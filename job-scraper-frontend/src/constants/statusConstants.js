@@ -79,6 +79,7 @@ export const REMOVAL_REASON_LABELS = {
     per_company_cap: 'Over the per-company limit',
     already_sent: 'Already sent by this schedule',
     known_agency: 'Known staffing agency (company memory)',
+    company_cooldown: 'Company sent recently (cooldown)',
 };
 
 export const AGENCY_MODE_LABELS = {

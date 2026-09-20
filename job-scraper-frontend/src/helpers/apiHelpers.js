@@ -107,3 +107,6 @@ export const setCompanyOverride = (key, isStaffingAgency, note = '') =>
         method: 'PATCH',
         body: JSON.stringify({ isStaffingAgency, note }),
     });
+
+export const allowCompanyAgain = (key) =>
+    request(`/companies/${encodeURIComponent(key)}/allow-again`, { method: 'POST' });

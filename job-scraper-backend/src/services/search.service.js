@@ -4,6 +4,7 @@ import { triggerActorRun } from './apify.service.js';
 import { JOB_STATUS, PLATFORMS } from '../constants/apifyConstants.js';
 import { AGENCY_MODE, DEFAULT_AGENCY_MODE, DEFAULT_MATCH_IN, COMPANY_SIZE_BANDS } from '../constants/filterConstants.js';
 import { DELIVERY_MODE, DEFAULT_DELIVERY_MODE } from '../constants/deliveryConstants.js';
+import { DEFAULT_COOLDOWN_DAYS, MAX_COOLDOWN_DAYS } from '../constants/companyConstants.js';
 
 const cleanList = (value) => {
     if (!Array.isArray(value)) return [];
@@ -50,6 +51,10 @@ export const parseInputs = (body = {}) => {
 
         webhookUrl: String(body.webhookUrl || '').trim(),
         deliveryMode: oneOf(body.deliveryMode, Object.values(DELIVERY_MODE), DEFAULT_DELIVERY_MODE),
+        cooldownDays: Math.min(
+            Math.max(body.cooldownDays === undefined || body.cooldownDays === null || body.cooldownDays === '' ? DEFAULT_COOLDOWN_DAYS : Number(body.cooldownDays) || 0, 0),
+            MAX_COOLDOWN_DAYS
+        ),
     };
 
     if (!inputs.keywords.length) throw new Error('Add at least one job title to search.');

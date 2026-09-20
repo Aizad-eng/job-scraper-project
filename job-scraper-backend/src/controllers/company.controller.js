@@ -1,5 +1,5 @@
 import Company from '../models/company.model.js';
-import { effectiveVerdict } from '../services/company.service.js';
+import { effectiveVerdict, clearCooldown } from '../services/company.service.js';
 import { COMPANIES_PAGE_SIZE, COMPANY_FILTER } from '../constants/companyConstants.js';
 
 const present = (company) => ({
@@ -14,6 +14,8 @@ const present = (company) => ({
     verdict: company.verdict,
     override: company.override,
     effective: effectiveVerdict(company),
+    lastSentAt: company.lastSentAt,
+    timesSent: company.timesSent || 0,
     firstSeenAt: company.firstSeenAt,
     lastSeenAt: company.lastSeenAt,
     timesSeen: company.timesSeen,
@@ -40,6 +42,8 @@ const filterQuery = (filter) => {
             return { 'override.isStaffingAgency': null, 'verdict.isStaffingAgency': null };
         case COMPANY_FILTER.OVERRIDDEN:
             return { 'override.isStaffingAgency': { $in: [true, false] } };
+        case COMPANY_FILTER.COOLDOWN:
+            return { lastSentAt: { $ne: null } };
         default:
             return {};
     }
@@ -115,6 +119,17 @@ export const setOverride = async (req, res) => {
             { returnDocument: 'after' }
         ).lean();
 
+        if (!company) return res.status(404).json({ success: false, error: 'Company not found' });
+        res.json({ success: true, company: present(company) });
+    } catch (error) {
+        res.status(500).json({ success: false, error: error.message });
+    }
+};
+
+// Forget the last delivery date, so the company can be sent again now.
+export const allowAgain = async (req, res) => {
+    try {
+        const company = await clearCooldown(req.params.key);
         if (!company) return res.status(404).json({ success: false, error: 'Company not found' });
         res.json({ success: true, company: present(company) });
     } catch (error) {

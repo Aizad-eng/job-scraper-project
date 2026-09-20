@@ -4,8 +4,9 @@ import {
   listCompanies,
   fetchCompanyStats,
   setCompanyOverride,
+  allowCompanyAgain,
 } from "../helpers/apiHelpers.js";
-import { formatDate } from "../helpers/formatHelpers.js";
+import { formatDate, formatAgo } from "../helpers/formatHelpers.js";
 import {
   COMPANY_FILTERS,
   VERDICT_LABEL,
@@ -61,6 +62,18 @@ export default function Companies() {
     setBusy((prev) => ({ ...prev, [company.key]: true }));
     try {
       await setCompanyOverride(company.key, value);
+      await load();
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setBusy((prev) => ({ ...prev, [company.key]: false }));
+    }
+  };
+
+  const allowAgain = async (company) => {
+    setBusy((prev) => ({ ...prev, [company.key]: true }));
+    try {
+      await allowCompanyAgain(company.key);
       await load();
     } catch (err) {
       setError(err.message);
@@ -173,6 +186,19 @@ export default function Companies() {
                   {formatDate(company.lastSeenAt)}
                   {sourceLabel(company) && <> · {sourceLabel(company)}</>}
                 </p>
+                {company.lastSentAt && (
+                  <p className="company-meta company-sent">
+                    Sent to webhook {company.timesSent}× · last {formatAgo(company.lastSentAt)}{" "}
+                    <button
+                      type="button"
+                      className="link-button inline"
+                      disabled={isBusy}
+                      onClick={() => allowAgain(company)}
+                    >
+                      allow again now
+                    </button>
+                  </p>
+                )}
               </div>
 
               <div className="company-side">

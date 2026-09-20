@@ -431,6 +431,27 @@ export default function SearchForm({
           )}
         </div>
 
+        <div className="field narrow">
+          <label className="field-label" htmlFor="cooldownDays">
+            Don't send the same company again for
+          </label>
+          <div className="input-with-suffix">
+            <input
+              id="cooldownDays"
+              type="number"
+              min="0"
+              max="365"
+              className="text-input"
+              value={values.cooldownDays}
+              onChange={(event) =>
+                setField("cooldownDays", Math.max(0, Number(event.target.value) || 0))
+              }
+            />
+            <span>days</span>
+          </div>
+          <p className="field-hint below">{FIELD_HINTS.cooldownDays}</p>
+        </div>
+
         <div className="field">
           <span className="field-label">Send</span>
           <div className="option-list">

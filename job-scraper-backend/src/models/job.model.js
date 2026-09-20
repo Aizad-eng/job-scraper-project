@@ -38,6 +38,7 @@ const jobSchema = new mongoose.Schema(
             // where results go
             webhookUrl: String,
             deliveryMode: { type: String, default: 'job' },
+            cooldownDays: { type: Number, default: 21 },
         },
         apifyRuns: [
             {

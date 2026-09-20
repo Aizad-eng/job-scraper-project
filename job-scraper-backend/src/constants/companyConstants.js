@@ -7,6 +7,11 @@ export const UNKNOWN_RETRY_DAYS = 30;
 // A "Yes" (staffing agency) verdict never expires — once an agency, always
 // skipped, unless someone overrides it by hand.
 
+// After a company is sent to the webhook, hold it back for this many days
+// (across every run and schedule). Per-search input; 0 turns it off.
+export const DEFAULT_COOLDOWN_DAYS = 21;
+export const MAX_COOLDOWN_DAYS = 365;
+
 export const COMPANIES_PAGE_SIZE = 50;
 
 export const COMPANY_FILTER = {
@@ -15,6 +20,7 @@ export const COMPANY_FILTER = {
     EMPLOYER: 'employer',
     UNKNOWN: 'unknown',
     OVERRIDDEN: 'overridden',
+    COOLDOWN: 'cooldown',
 };
 
 export const VERDICT_SOURCE = {

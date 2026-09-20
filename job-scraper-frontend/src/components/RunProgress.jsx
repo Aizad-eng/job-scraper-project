@@ -281,6 +281,10 @@ export default function RunProgress({ jobId, status, onReset, onRerun, onOpenSch
                 <dd>{status.inputs.employmentTypes.join(", ")}</dd>
               </div>
             )}
+            <div>
+              <dt>Company cooldown</dt>
+              <dd>{status.inputs.cooldownDays > 0 ? `${status.inputs.cooldownDays} days` : "Off"}</dd>
+            </div>
             <div className="wide">
               <dt>Webhook</dt>
               <dd>

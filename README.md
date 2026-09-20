@@ -66,6 +66,8 @@ These are only called when "Staffing agencies" is set to *Remove agencies* or *K
 
 **Company memory.** Every company that gets past the rule filters is recorded in a `companies` collection (one document per domain) with what the job board said about it, how often it has appeared, and the check result. Before spending a check, the pipeline looks the company up: a known staffing agency is skipped forever (reported as *Known staffing agency*), a direct-employer verdict is reused for 180 days, an Unknown is retried after 30 days. The **Companies** tab lists everything with search and filters, and lets you mark a company as agency or employer by hand; a hand-set value always wins and is never re-checked. *Word screen only* also uses memory (it is free), it just never calls the paid check.
 
+**Cooldown.** After delivery, each sent company gets `lastSentAt` on its memory record. Before delivery, any company sent within the search's cooldown window is dropped and reported as *Company sent recently (cooldown)*. This works across one-off runs and all schedules, in both row modes.
+
 **How the company check decides.** For each unique company with a website: ScrapingDog asks Google AI Mode to visit the site and answer `is_recruitment_firm: Yes / No / Unknown` with an industry and a 2–3 sentence description. If the answer is clean JSON it is used as-is. If it comes back as prose or fenced text, Claude (`claude-opus-5`, structured output) converts it into the same record. `Yes` removes (or flags) the company, `No` keeps it, `Unknown` keeps it undecided. If ScrapingDog is not configured, errors (for example out of credits), or gives nothing usable, the old GPT / Perplexity classifiers run when their keys are set; otherwise the company is kept. Every row carries `aiIndustry`, `aiSummary` and `aiSource` from whichever check ran.
 
 ### Backend
@@ -137,6 +139,7 @@ Runs on `http://localhost:5173` and proxies `/api` to `http://localhost:5000` (s
 2. **Company size** — pick LinkedIn-style bands. Nothing selected means any size. Optionally keep companies whose size is unknown.
 3. **Filters** — how to handle staffing agencies, must-mention words, excluded words. *More filters* adds industries to keep or drop, companies to skip, seniority level, employment type, and a per-company cap.
 4. **Where to send results** — the webhook URL (remembered in the browser) and whether to send one row per job listing or one per company. **Send test row** POSTs a sample record marked `isTest: true` so the receiver can set up its columns before spending anything.
+   **Don't send the same company again for N days** (default 21) is the cooldown: once a company has been sent to the webhook, every run and schedule holds it back for that long, even if it posts more jobs. Set 0 to turn it off for a search. The Companies tab shows when each company was last sent and has an *allow again now* link.
 5. **Repeat** — *Run once now*, or *Run on a schedule*: a name, how often (every day / every N days / chosen weekdays), the time of day, and whether to skip listings already sent. The timezone is taken from the browser.
 
 The progress page shows each stage with counts, why listings were removed, the settings used, and lets you run again with the same settings.
@@ -229,7 +232,7 @@ job-scraper-backend/
 ├── src/routes/
 │   ├── scrape.routes.js            POST /scrape, GET /job-status/:id, POST /test-webhook
 │   ├── schedule.routes.js          CRUD, run now, reset sent
-│   ├── company.routes.js           List / search companies, stats, set override
+│   ├── company.routes.js           List / search companies, stats, set override, allow again
 │   └── webhook.routes.js           POST /apify-webhook
 ├── src/controllers/
 │   ├── scrape.controller.js        Starts a one-off search, reports status

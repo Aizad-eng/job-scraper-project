@@ -131,3 +131,45 @@ export const effectiveVerdict = (company) => {
     }
     return { isStaffingAgency: null, source: null };
 };
+
+/**
+ * Keys of companies sent to a webhook within the last `days` days.
+ * These are held back from delivery (the cooldown).
+ */
+export const getCompaniesOnCooldown = async (keys, days) => {
+    if (!keys.length || !days || days <= 0) return new Map();
+    const since = new Date(Date.now() - days * DAY_MS);
+    const rows = await Company.find({ key: { $in: keys }, lastSentAt: { $gte: since } })
+        .select('key lastSentAt')
+        .lean();
+    return new Map(rows.map((row) => [row.key, row.lastSentAt]));
+};
+
+// Marks these companies as sent right now.
+export const markCompaniesSent = async (keys, jobId) => {
+    const unique = [...new Set(keys.filter(Boolean))];
+    if (!unique.length) return;
+    const now = new Date();
+    await Company.bulkWrite(
+        unique.map((key) => ({
+            updateOne: {
+                filter: { key },
+                update: {
+                    $set: { lastSentAt: now, lastSentJobId: jobId || null },
+                    $setOnInsert: { key, firstSeenAt: now },
+                    $inc: { timesSent: 1 },
+                },
+                upsert: true,
+            },
+        })),
+        { ordered: false }
+    );
+};
+
+// Lets a company be sent again straight away.
+export const clearCooldown = async (key) =>
+    Company.findOneAndUpdate({ key }, { $set: { lastSentAt: null } }, { returnDocument: 'after' }).lean();
+
+// Company key for a webhook payload (same rule as companyKey for jobs).
+export const payloadCompanyKey = (payload) =>
+    normalizeDomain(payload.companyDomain) || (payload.companyName || '').toLowerCase().trim();

@@ -49,6 +49,7 @@ export const REMOVAL_REASON = {
     PER_COMPANY_CAP: 'per_company_cap',
     ALREADY_SENT: 'already_sent',
     KNOWN_AGENCY: 'known_agency',
+    COMPANY_COOLDOWN: 'company_cooldown',
 };
 
 export const REMOVAL_REASON_LABELS = {
@@ -65,6 +66,7 @@ export const REMOVAL_REASON_LABELS = {
     per_company_cap: 'Over the per-company cap',
     already_sent: 'Already sent by this schedule',
     known_agency: 'Known staffing agency (company memory)',
+    company_cooldown: 'Company sent recently (cooldown)',
 };
 
 export const STRIPPED_JOB_FIELDS = [

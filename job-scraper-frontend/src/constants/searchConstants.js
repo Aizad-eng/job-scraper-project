@@ -73,6 +73,7 @@ export const DEFAULT_FORM_VALUES = {
 
     webhookUrl: '',
     deliveryMode: 'job',
+    cooldownDays: 21,
 };
 
 export const JOBS_PER_KEYWORD_OPTIONS = [10, 25, 50, 100, 250, 500];
@@ -92,6 +93,7 @@ export const FIELD_HINTS = {
     maxJobsPerCompany: 'Stops one big employer flooding the results. 0 means no limit.',
     webhookUrl: 'Every row is POSTed here as JSON. Works with Clay, Zapier, Make, n8n or your own endpoint.',
     postedWithin: 'Recent postings are a stronger hiring signal and cost less to process.',
+    cooldownDays: 'Once a company is sent, hold it back for this many days across every run and schedule, even if it posts more jobs. 0 turns this off.',
 };
 
 export const POSTED_WITHIN_OPTIONS = [

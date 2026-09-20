@@ -4,6 +4,7 @@ export const COMPANY_FILTERS = [
     { value: 'employer', label: 'Direct employers' },
     { value: 'unknown', label: 'Unchecked' },
     { value: 'overridden', label: 'Set by hand' },
+    { value: 'cooldown', label: 'Sent to webhook' },
 ];
 
 export const VERDICT_LABEL = {

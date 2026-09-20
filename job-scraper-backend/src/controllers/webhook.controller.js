@@ -6,7 +6,14 @@ import { AGENCY_MODE, REMOVAL_REASON } from '../constants/filterConstants.js';
 import { DELIVERY_STATE } from '../constants/deliveryConstants.js';
 import { applyRuleFilters, applyPerCompanyCap } from '../services/filter.service.js';
 import { classifyCompanies } from '../services/classification.service.js';
-import { recordCompaniesSeen, getKnownVerdicts, saveVerdicts } from '../services/company.service.js';
+import {
+    recordCompaniesSeen,
+    getKnownVerdicts,
+    saveVerdicts,
+    getCompaniesOnCooldown,
+    markCompaniesSent,
+    payloadCompanyKey,
+} from '../services/company.service.js';
 import { buildPayloads, deliverAll, payloadKey } from '../services/delivery.service.js';
 import { groupByCompany, companyKey, normalizeJob, stripJobFields, countByReason } from '../helpers/jobHelpers.js';
 
@@ -247,6 +254,43 @@ const runPipeline = async (job) => {
             }
         }
 
+        // ---- COOLDOWN ----
+        // A company sent to the webhook recently is held back, whatever it posts.
+        if (inputs.cooldownDays > 0 && payloads.length) {
+            const keys = payloads.map(payloadCompanyKey);
+            const onCooldown = await getCompaniesOnCooldown(keys, inputs.cooldownDays);
+            if (onCooldown.size) {
+                const fresh = [];
+                payloads.forEach((payload, i) => {
+                    const sentAt = onCooldown.get(keys[i]);
+                    if (sentAt) {
+                        removed.push({
+                            companyName: payload.companyName,
+                            title: payload.jobTitle || payload.firstJobTitle || null,
+                            reason: REMOVAL_REASON.COMPANY_COOLDOWN,
+                            detail: `sent ${new Date(sentAt).toISOString().slice(0, 10)}, cooldown ${inputs.cooldownDays} days`,
+                        });
+                    } else {
+                        fresh.push(payload);
+                    }
+                });
+                payloads = fresh;
+
+                job.removedJobs = removed;
+                job.removedByReason = countByReason(removed);
+                job.markModified('removedJobs');
+                job.markModified('removedByReason');
+                await job.save();
+
+                console.log(`Job ${job.jobId}: ${onCooldown.size} companies on cooldown, ${payloads.length} rows left`);
+
+                if (!payloads.length) {
+                    await finishEmpty(job, `Every matching company was sent in the last ${inputs.cooldownDays} days. Nothing new to send.`);
+                    return;
+                }
+            }
+        }
+
         job.status = JOB_STATUS.DELIVERING;
         job.delivery = {
             state: DELIVERY_STATE.SENDING,
@@ -269,6 +313,16 @@ const runPipeline = async (job) => {
         });
 
         const allFailed = outcome.sent === 0 && outcome.failed > 0;
+
+        if (outcome.sent > 0) {
+            const failed = new Set(outcome.failedIndexes);
+            const sentKeys = payloads.filter((_, i) => !failed.has(i)).map(payloadCompanyKey);
+            try {
+                await markCompaniesSent(sentKeys, job.jobId);
+            } catch (error) {
+                console.error(`Job ${job.jobId}: could not mark companies sent:`, error.message);
+            }
+        }
 
         if (job.scheduleId && outcome.sent > 0) {
             const failed = new Set(outcome.failedIndexes);

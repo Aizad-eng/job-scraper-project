@@ -33,6 +33,11 @@ const companySchema = new mongoose.Schema(
             setAt: { type: Date, default: null },
         },
 
+        // delivery history, drives the cooldown
+        lastSentAt: { type: Date, default: null, index: true },
+        timesSent: { type: Number, default: 0 },
+        lastSentJobId: { type: String, default: null },
+
         firstSeenAt: { type: Date, default: null },
         lastSeenAt: { type: Date, default: null, index: true },
         timesSeen: { type: Number, default: 0 },      // runs this company appeared in

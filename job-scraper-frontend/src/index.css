@@ -1013,3 +1013,20 @@ details[open] summary::before {
     justify-content: flex-start;
   }
 }
+
+.input-with-suffix {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  gap: 8px;
+}
+.input-with-suffix span {
+  color: var(--ink-soft);
+  font-size: 14px;
+}
+.company-sent {
+  color: var(--active);
+}
+.company-sent .link-button {
+  font-size: 13px;
+}
