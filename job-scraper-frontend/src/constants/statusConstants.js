@@ -81,6 +81,7 @@ export const REMOVAL_REASON_LABELS = {
     known_agency: 'Known staffing agency (company memory)',
     company_cooldown: 'Company sent recently (cooldown)',
     duplicate_listing: 'Duplicate listing in this run',
+    salary: 'Salary outside your range',
 };
 
 export const AGENCY_MODE_LABELS = {

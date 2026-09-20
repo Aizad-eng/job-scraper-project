@@ -52,6 +52,10 @@ export const parseInputs = (body = {}) => {
         webhookUrl: String(body.webhookUrl || '').trim(),
         deliveryMode: oneOf(body.deliveryMode, Object.values(DELIVERY_MODE), DEFAULT_DELIVERY_MODE),
         findMissingDomains: body.findMissingDomains !== false,
+        extractSalaries: body.extractSalaries !== false,
+        salaryMin: body.salaryMin === '' || body.salaryMin === null || body.salaryMin === undefined ? null : Math.max(0, Number(body.salaryMin) || 0),
+        salaryMax: body.salaryMax === '' || body.salaryMax === null || body.salaryMax === undefined ? null : Math.max(0, Number(body.salaryMax) || 0),
+        includeNoSalary: body.includeNoSalary !== false,
         cooldownDays: Math.min(
             Math.max(body.cooldownDays === undefined || body.cooldownDays === null || body.cooldownDays === '' ? DEFAULT_COOLDOWN_DAYS : Number(body.cooldownDays) || 0, 0),
             MAX_COOLDOWN_DAYS
@@ -61,6 +65,9 @@ export const parseInputs = (body = {}) => {
     if (!inputs.keywords.length) throw new Error('Add at least one job title to search.');
     if (!inputs.platforms.length) throw new Error('Pick at least one job board.');
     if (!isValidWebhookUrl(inputs.webhookUrl)) throw new Error('Enter a valid webhook URL (must start with https://).');
+    if (inputs.salaryMin !== null && inputs.salaryMax !== null && inputs.salaryMin > inputs.salaryMax) {
+        throw new Error('Minimum salary is larger than maximum.');
+    }
 
     return inputs;
 };

@@ -58,7 +58,7 @@ A search can also be saved as a **schedule**: every day, every N days, or chosen
 | ----------- | ------------------ | --------------------------------------------------------------- | --------------------------------------- |
 | Apify       | `APIFY_TOKEN`      | Running the job scrapers                                        | Console → Settings → API & Integrations |
 | ScrapingDog | `SCRAPPINGDOG_KEY` | Google AI Mode visits each company website (10 credits/company) | scrapingdog.com dashboard               |
-| Claude      | `CLAUDE_KEY`       | Turning a non-JSON AI Mode answer into the strict record        | console.anthropic.com → API keys        |
+| Claude      | `CLAUDE_KEY`       | Structuring AI Mode answers (Opus 5); salary extraction (Haiku 4.5) | console.anthropic.com → API keys     |
 | OpenAI      | `OPENAI_API_KEY`   | Optional fallback: classify from the job board's description    | platform.openai.com → API keys          |
 | Perplexity  | `PERPLEXITY_API_KEY` | Optional fallback: classify from the website                  | Settings → API                          |
 
@@ -69,6 +69,8 @@ These are only called when "Staffing agencies" is set to *Remove agencies* or *K
 **Duplicates inside a run.** Every keyword × board scrape is merged first, then the same listing (same board, same URL or ID) is kept once, and the same job title at the same company seen on both boards is kept once. Reported as *Duplicate listing in this run*.
 
 **Domains.** Everything downstream (memory, cooldown, dedupe) keys on the company's registrable domain, normalised. A value from the job board that is a link shortener, social page, job board, ATS, email provider, or that does not resemble the company name is thrown away and counted as missing. With *Find missing company domains* on (default), each company without a usable domain is searched once on Google through ScrapingDog (5 credits) for its official website; the first result that passes the same checks is used, and the answer (found or not) is remembered by company name, so it is never paid for twice. Rows carry `companyDomainSource`: `board`, `found`, `memory`, or `none`. The run page shows how many domains came from where.
+
+**Salaries.** Every kept listing gets `salaryMinPerYear`, `salaryMaxPerYear`, `salaryCurrency` and `salarySource`. Cheapest source first: Indeed's annualised numbers (`board`), then a deterministic parse of the board's salary text such as "$70,000 - $90,000 per year" or "€18.50 per hour" (`parsed`, converted to a year: hour × 2080, day × 260, week × 52, month × 12), and only then Claude Haiku 4.5 reading the board text or the description (`claude-text` / `claude-description`), returning nothing when no pay is stated. Extraction runs after the cheap filters, so it is never paid for rows that would be dropped anyway. The **Salary per year** filter keeps listings whose range overlaps yours; *Keep listings that state no salary* decides what happens to the rest. *Extract salaries from descriptions with Claude* (More filters) turns the model step off.
 
 **Cooldown.** After delivery, each sent company gets `lastSentAt` on its memory record. Before delivery, any company sent within the search's cooldown window is dropped and reported as *Company sent recently (cooldown)*. This works across one-off runs and all schedules, in both row modes.
 
@@ -173,7 +175,8 @@ One row per **job listing** (default):
   "seniorityLevel": "Mid-Senior level",
   "jobFunction": "Engineering",
   "salary": "$140,000/yr - $180,000/yr",
-  "salaryMinPerYear": null, "salaryMaxPerYear": null,
+  "salaryMinPerYear": 140000, "salaryMaxPerYear": 180000,
+  "salaryCurrency": "USD", "salarySource": "parsed",
   "applicants": "25 applicants",
   "jobPosterName": "…", "jobPosterTitle": "…", "jobPosterProfileUrl": "…",
   "jobDescription": "…",
@@ -227,6 +230,7 @@ job-scraper-backend/
 │   ├── deliveryConstants.js        Delivery modes, rate limit, retry policy
 │   ├── companyConstants.js         Verdict lifetimes, cooldown default, list filters
 │   ├── domainConstants.js          Bad-domain list, lookup settings
+│   ├── salaryConstants.js          Haiku model, period multipliers, prompt
 │   └── scheduleConstants.js        Frequencies, tick interval, sent-listing retention
 ├── src/middleware/
 │   ├── auth.js                     Access-key gate and Apify webhook secret
@@ -255,6 +259,7 @@ job-scraper-backend/
 │   ├── filter.service.js           Rule filters and per-company cap
 │   ├── company.service.js          Record companies seen, verdicts, cooldown
 │   ├── domainLookup.service.js     Clean board domains, find missing ones via Google
+│   ├── salary.service.js           Board → parsed → Claude Haiku salary extraction, salary filter
 │   ├── scrapingdog.service.js      Google AI Mode call + answer parsing
 │   ├── claude.service.js           Structured-output cleanup of loose answers
 │   ├── ai.service.js               GPT and Perplexity fallbacks
@@ -263,6 +268,7 @@ job-scraper-backend/
 └── src/helpers/
     ├── jobHelpers.js               Platform normalising, size parsing, word matching, dedupe
     ├── domainHelpers.js            Bad-domain screen, name ↔ domain matching
+    ├── salaryHelpers.js            Salary text parsing, period → year conversion
     └── scheduleHelpers.js          Timezone math, next-run calculation
 
 job-scraper-frontend/src/
@@ -308,6 +314,7 @@ job-scraper-frontend/src/
 | **Only / exclude industries** | Substring match on the company's industry labels.                                                |
 | **Exclude companies**     | Company names (exact, case-insensitive) or domains.                                                  |
 | **Seniority / employment type** | LinkedIn labels. Listings without a value are kept.                                            |
+| **Salary per year**       | Yearly range the listing's pay must overlap. Hourly / monthly pay is annualised. Unknown kept or dropped by the toggle. |
 | **Max listings per company** | Also passed to the actors, then enforced again across all scrapes. 0 = no limit.                  |
 | **Webhook URL**           | Where rows are POSTed. Remembered in the browser.                                                    |
 | **Send**                  | One row per job listing, or one per company.                                                         |

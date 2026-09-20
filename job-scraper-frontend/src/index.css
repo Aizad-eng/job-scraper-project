@@ -1036,3 +1036,7 @@ details[open] summary::before {
   padding: 10px 0 14px;
   border-top: 1px solid var(--line);
 }
+
+.check.top-gap {
+  margin-top: 10px;
+}

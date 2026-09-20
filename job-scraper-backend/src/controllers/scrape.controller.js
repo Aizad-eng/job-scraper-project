@@ -45,6 +45,7 @@ export const getJobStatus = async (req, res) => {
             removedByReason: job.removedByReason || {},
             companiesCount: job.companiesCount || 0,
             domainStats: job.domainStats || null,
+            salaryStats: job.salaryStats || null,
             delivery: job.delivery || null,
             emptyReason: job.emptyReason,
             error: job.error,

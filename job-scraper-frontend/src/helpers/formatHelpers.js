@@ -70,6 +70,12 @@ export const validateForm = (values) => {
         errors.excludeMatchIn = 'Pick where to look';
     }
 
+    const salaryMin = values.salaryMin === '' ? null : Number(values.salaryMin);
+    const salaryMax = values.salaryMax === '' ? null : Number(values.salaryMax);
+    if (salaryMin !== null && salaryMax !== null && salaryMin > salaryMax) {
+        errors.salary = 'Minimum is larger than maximum';
+    }
+
     return errors;
 };
 

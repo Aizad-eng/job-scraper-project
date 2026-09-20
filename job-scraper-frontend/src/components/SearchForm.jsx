@@ -35,6 +35,7 @@ const restoreValues = (initialValues) => {
   // only take keys the form actually knows about
   return Object.keys(DEFAULT_FORM_VALUES).reduce((acc, key) => {
     acc[key] = initialValues[key] ?? base[key];
+    if ((key === "salaryMin" || key === "salaryMax") && acc[key] === null) acc[key] = "";
     return acc;
   }, {});
 };
@@ -85,7 +86,12 @@ export default function SearchForm({
       return;
     }
     rememberWebhook(values.webhookUrl.trim());
-    const inputs = { ...values, webhookUrl: values.webhookUrl.trim() };
+    const inputs = {
+      ...values,
+      webhookUrl: values.webhookUrl.trim(),
+      salaryMin: values.salaryMin === "" ? null : Number(values.salaryMin),
+      salaryMax: values.salaryMax === "" ? null : Number(values.salaryMax),
+    };
     if (isSchedule) onSaveSchedule(inputs, schedule, editingSchedule?.scheduleId || null);
     else onSubmit(inputs);
   };
@@ -315,6 +321,46 @@ export default function SearchForm({
           />
         )}
 
+        <div className="field">
+          <span className="field-label">Salary per year</span>
+          <p className="field-hint">{FIELD_HINTS.salary}</p>
+          <div className="range-row">
+            <input
+              type="number"
+              min="0"
+              step="1000"
+              className="text-input"
+              value={values.salaryMin}
+              onChange={(event) => setField("salaryMin", event.target.value)}
+              placeholder="min, e.g. 80000"
+              aria-label="Minimum salary per year"
+            />
+            <span className="range-dash">to</span>
+            <input
+              type="number"
+              min="0"
+              step="1000"
+              className="text-input"
+              value={values.salaryMax}
+              onChange={(event) => setField("salaryMax", event.target.value)}
+              placeholder="max"
+              aria-label="Maximum salary per year"
+            />
+          </div>
+          {errors.salary && <p className="field-error">{errors.salary}</p>}
+          {(values.salaryMin !== "" || values.salaryMax !== "") && (
+            <label className="check top-gap">
+              <input
+                type="checkbox"
+                checked={values.includeNoSalary}
+                onChange={(event) => setField("includeNoSalary", event.target.checked)}
+              />
+              <span>Keep listings that state no salary</span>
+              <em>{FIELD_HINTS.includeNoSalary}</em>
+            </label>
+          )}
+        </div>
+
         <button
           type="button"
           className="link-button"
@@ -368,6 +414,16 @@ export default function SearchForm({
               allLabel="Any"
               compact
             />
+            <label className="check">
+              <input
+                type="checkbox"
+                checked={values.extractSalaries}
+                onChange={(event) => setField("extractSalaries", event.target.checked)}
+              />
+              <span>Extract salaries from descriptions with Claude</span>
+              <em>{FIELD_HINTS.extractSalaries}</em>
+            </label>
+
             <label className="check">
               <input
                 type="checkbox"

@@ -17,6 +17,7 @@ import {
 import { buildPayloads, deliverAll, payloadKey } from '../services/delivery.service.js';
 import { groupByCompany, companyKey, normalizeJob, stripJobFields, countByReason, dedupeListings } from '../helpers/jobHelpers.js';
 import { resolveCompanyDomains } from '../services/domainLookup.service.js';
+import { resolveSalaries, applySalaryFilter } from '../services/salary.service.js';
 
 const EVENT_TO_STATUS = {
     'ACTOR.RUN.SUCCEEDED': 'SUCCEEDED',
@@ -140,6 +141,25 @@ const runPipeline = async (job) => {
         const redup = dedupeListings(kept);
         kept = redup.kept;
         removed.push(...redup.removed);
+
+        // ---- SALARIES ----
+        // Board numbers, then parsed text, then Claude on the description.
+        try {
+            const salaryStats = await resolveSalaries(kept, { useClaude: inputs.extractSalaries !== false });
+            job.salaryStats = salaryStats;
+            job.markModified('salaryStats');
+            console.log(`Job ${job.jobId}: salaries — ${JSON.stringify(salaryStats)}`);
+        } catch (error) {
+            console.error(`Job ${job.jobId}: salary extraction failed:`, error.message);
+        }
+
+        const salaryFiltered = applySalaryFilter(kept, {
+            salaryMin: inputs.salaryMin ?? null,
+            salaryMax: inputs.salaryMax ?? null,
+            includeNoSalary: inputs.includeNoSalary !== false,
+        });
+        kept = salaryFiltered.kept;
+        removed.push(...salaryFiltered.removed);
 
         // ---- COMPANY MEMORY ----
         // Every company we see is recorded, whatever the agency setting.

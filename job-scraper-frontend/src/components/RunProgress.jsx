@@ -184,6 +184,17 @@ export default function RunProgress({ jobId, status, onReset, onRerun, onOpenSch
         </p>
       )}
 
+      {status.salaryStats && (
+        <p className="muted domain-note">
+          Salaries: {status.salaryStats.board + status.salaryStats.parsed} from the boards
+          {status.salaryStats.claudeText + status.salaryStats.claudeDescription > 0 && (
+            <>, {status.salaryStats.claudeText + status.salaryStats.claudeDescription} found by Claude</>
+          )}
+          {status.salaryStats.none > 0 && <>, {status.salaryStats.none} not stated</>}
+          {status.salaryStats.failed > 0 && <>, {status.salaryStats.failed} failed</>}
+        </p>
+      )}
+
       {removedEntries.length > 0 && (
         <details className="removed" open={isEmpty}>
           <summary>
@@ -289,6 +300,17 @@ export default function RunProgress({ jobId, status, onReset, onRerun, onOpenSch
               <div className="wide">
                 <dt>Employment type</dt>
                 <dd>{status.inputs.employmentTypes.join(", ")}</dd>
+              </div>
+            )}
+            {(status.inputs.salaryMin != null || status.inputs.salaryMax != null) && (
+              <div>
+                <dt>Salary per year</dt>
+                <dd>
+                  {status.inputs.salaryMin != null ? status.inputs.salaryMin.toLocaleString() : "any"}
+                  {" – "}
+                  {status.inputs.salaryMax != null ? status.inputs.salaryMax.toLocaleString() : "any"}
+                  <em>{status.inputs.includeNoSalary === false ? " · unknown dropped" : " · unknown kept"}</em>
+                </dd>
               </div>
             )}
             <div>

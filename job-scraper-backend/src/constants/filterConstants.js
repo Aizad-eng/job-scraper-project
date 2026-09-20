@@ -51,6 +51,7 @@ export const REMOVAL_REASON = {
     KNOWN_AGENCY: 'known_agency',
     COMPANY_COOLDOWN: 'company_cooldown',
     DUPLICATE_LISTING: 'duplicate_listing',
+    SALARY: 'salary',
 };
 
 export const REMOVAL_REASON_LABELS = {
@@ -69,6 +70,7 @@ export const REMOVAL_REASON_LABELS = {
     known_agency: 'Known staffing agency (company memory)',
     company_cooldown: 'Company sent recently (cooldown)',
     duplicate_listing: 'Duplicate listing in this run',
+    salary: 'Salary outside your range',
 };
 
 export const STRIPPED_JOB_FIELDS = [

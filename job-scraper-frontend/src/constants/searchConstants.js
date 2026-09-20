@@ -75,6 +75,10 @@ export const DEFAULT_FORM_VALUES = {
     deliveryMode: 'job',
     cooldownDays: 21,
     findMissingDomains: true,
+    extractSalaries: true,
+    salaryMin: '',
+    salaryMax: '',
+    includeNoSalary: true,
 };
 
 export const JOBS_PER_KEYWORD_OPTIONS = [10, 25, 50, 100, 250, 500];
@@ -94,6 +98,9 @@ export const FIELD_HINTS = {
     maxJobsPerCompany: 'Stops one big employer flooding the results. 0 means no limit.',
     webhookUrl: 'Every row is POSTed here as JSON. Works with Clay, Zapier, Make, n8n or your own endpoint.',
     postedWithin: 'Recent postings are a stronger hiring signal and cost less to process.',
+    salary: 'Yearly figures. Pay stated per hour, week or month is converted to a year. Leave both empty for any salary.',
+    includeNoSalary: 'Many listings state no pay at all. Untick to drop them.',
+    extractSalaries: 'When the board gives no usable figure, Claude reads the description and pulls out any stated pay. A fraction of a cent per listing.',
     findMissingDomains: 'Shorteners, social links and job-board pages never count as a domain. When a company has no usable domain, Google is searched for its website (5 ScrapingDog credits per company, remembered afterwards).',
     cooldownDays: 'Once a company is sent, hold it back for this many days across every run and schedule, even if it posts more jobs. 0 turns this off.',
 };

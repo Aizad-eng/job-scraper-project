@@ -40,6 +40,10 @@ const jobSchema = new mongoose.Schema(
             deliveryMode: { type: String, default: 'job' },
             cooldownDays: { type: Number, default: 21 },
             findMissingDomains: { type: Boolean, default: true },
+            extractSalaries: { type: Boolean, default: true },
+            salaryMin: { type: Number, default: null },
+            salaryMax: { type: Number, default: null },
+            includeNoSalary: { type: Boolean, default: true },
         },
         apifyRuns: [
             {
@@ -56,6 +60,7 @@ const jobSchema = new mongoose.Schema(
         removedByReason: { type: Object, default: {} },
         companiesCount: { type: Number, default: 0 },
         domainStats: { type: Object, default: null },
+        salaryStats: { type: Object, default: null },
         delivery: {
             state: { type: String, default: null },
             total: { type: Number, default: 0 },
