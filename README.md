@@ -160,6 +160,8 @@ The **Schedules** tab lists every saved schedule with its next run, last run, an
 
 **Bulk changes.** Tick the schedules you want (or *Select all*, *active*, *paused*), then **Activate**, **Deactivate**, **Run now** or **Delete** them together, or **Change settings** to set listings per title, posted-within, staffing-agency mode, row mode, cooldown, keyword spacing, salary range, run time, already-sent handling or the webhook URL on all of them at once. Only the fields you set are changed; everything else on each schedule stays. A schedule that rejects the change (for example an invalid webhook URL) is reported by name and left untouched.
 
+**Scale.** Listings are not stored on the job. Each page of an Apify run (500 rows) is normalised, deduplicated by the `listings` collection's unique indexes (same listing from another keyword, same title at the same company from the other board) and rule-filtered as it arrives; only listings that pass are stored, one document each, with the description capped at 12,000 characters, and they expire after 14 days. The job keeps counts (`scrapedCount`, `keptCount`, `finalCount`, `removedByReason`) and a 200-row sample of what was removed. Every later stage (domains, salaries, titles, agency check, cap, cooldown, delivery) walks the kept listings in batches of 200, so a run of 30,000 or 300,000 listings uses the same memory and never touches Mongo's 16 MB document limit. A 30,000-listing run ingests in seconds and delivers in batches.
+
 **Concurrency cap.** Never more than **5 actor runs in flight** across every search and schedule together. Every keyword × board search is queued on its job and started as slots free up, oldest job first; *Actor runs at once* (step 1, default 5, max 5) lets a search use fewer. A watchdog checks any run still marked running after 5 minutes directly with Apify, so a callback that never arrived (server asleep, stale `PUBLIC_BASE_URL`) cannot hold a slot or stall a job. The run page shows running / queued counts.
 
 **Keyword spacing.** A schedule can space its keyword searches out: *Minutes between keyword searches* (default 20 for schedules, 0 for one-off runs). The first keyword starts at the scheduled time on every board; each next keyword starts that many minutes later. The queued searches live on the job (`pendingLaunches`) and the same 30-second tick launches them when due, so a restart in between loses nothing. Filtering and delivery happen once, after the last search has finished. The run page shows how many are queued and when the next starts.
@@ -246,7 +248,8 @@ job-scraper-backend/
 │   ├── auth.js                     Access-key gate and Apify webhook secret
 │   └── rateLimit.js                Brute-force guard for the password check
 ├── src/models/
-│   ├── job.model.js                The Job document — inputs, results, delivery stats
+│   ├── job.model.js                The Job document — inputs, counts, delivery stats
+│   ├── listing.model.js            One document per kept listing (unique indexes = dedupe)
 │   ├── schedule.model.js           A saved search with its timing and last-run info
 │   ├── company.model.js            Company memory: what we know, verdict, override, seen / sent
 │   ├── domainLookup.model.js       Google domain lookups by company name

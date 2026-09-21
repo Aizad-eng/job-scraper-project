@@ -288,3 +288,22 @@ export const daysSincePosted = (postedAt, now = Date.now()) => {
     if (!Number.isFinite(time)) return null;
     return Math.max(0, Math.floor((now - time) / 86400000));
 };
+
+// Identity keys used by the Listing collection's unique indexes.
+export const listingKeyOf = (job) => {
+    const id = (job.link || job.id || '').toLowerCase().trim();
+    return id ? `${job.platform}|${id}` : null;
+};
+export const titleKeyOf = (job) => {
+    const company = companyKey(job);
+    const title = String(job.title || '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+    return company && title ? `${company}|${title}` : null;
+};
+
+export const MAX_DESCRIPTION_CHARS = 12_000;
+export const capDescription = (job) => {
+    if (typeof job.descriptionText === 'string' && job.descriptionText.length > MAX_DESCRIPTION_CHARS) {
+        job.descriptionText = `${job.descriptionText.slice(0, MAX_DESCRIPTION_CHARS)}…`;
+    }
+    return job;
+};

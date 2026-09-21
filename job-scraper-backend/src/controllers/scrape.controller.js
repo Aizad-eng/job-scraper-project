@@ -44,9 +44,11 @@ export const getJobStatus = async (req, res) => {
             nextLaunchAt: job.pendingLaunches?.length
                 ? job.pendingLaunches.reduce((min, p) => (p.launchAt < min ? p.launchAt : min), job.pendingLaunches[0].launchAt)
                 : null,
-            scrapedCount: job.scrapedJobs?.length || 0,
-            keptCount: job.filteredJobs?.length || 0,
-            removedCount: job.removedJobs?.length || 0,
+            scrapedCount: job.scrapedCount || 0,
+            keptCount: job.status === JOB_STATUS.SCRAPING || job.status === JOB_STATUS.FILTERING || job.status === JOB_STATUS.CLASSIFYING
+                ? (job.keptCount || 0)
+                : (job.finalCount ?? job.keptCount ?? 0),
+            removedCount: Object.values(job.removedByReason || {}).reduce((a, b) => a + (Number(b) || 0), 0),
             removedByReason: job.removedByReason || {},
             companiesCount: job.companiesCount || 0,
             domainStats: job.domainStats || null,

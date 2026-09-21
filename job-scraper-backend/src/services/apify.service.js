@@ -70,11 +70,11 @@ export const triggerActorRun = async (platform, inputParams, webhookUrl) => {
     return response.data.data.id;
 };
 
-// Fetches the results of a finished run, page by page
-export const fetchRunResults = async (runId) => {
-    const items = [];
-    const limit = 1000;
+// Streams the results of a finished run to `onPage`, 500 at a time, so a
+// large dataset is never held in memory whole. Returns the item count.
+export const fetchRunResultsPaged = async (runId, onPage, { limit = 500 } = {}) => {
     let offset = 0;
+    let total = 0;
 
     for (;;) {
         const response = await axios.get(
@@ -82,11 +82,19 @@ export const fetchRunResults = async (runId) => {
             { headers: apifyHeaders(), params: { limit, offset, clean: true } }
         );
         const page = response.data || [];
-        items.push(...page);
+        if (page.length) await onPage(page);
+        total += page.length;
         if (page.length < limit) break;
         offset += limit;
     }
 
+    return total;
+};
+
+// Convenience for small runs / tests: everything at once.
+export const fetchRunResults = async (runId) => {
+    const items = [];
+    await fetchRunResultsPaged(runId, async (page) => { items.push(...page); });
     return items;
 };
 

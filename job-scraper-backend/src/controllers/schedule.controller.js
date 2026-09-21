@@ -51,8 +51,8 @@ const runSummary = (job) => ({
     statusLabel: JOB_STATUS_LABELS[job.status] || job.status,
     createdAt: job.createdAt,
     updatedAt: job.updatedAt,
-    scrapedCount: job.scrapedJobs?.length || 0,
-    keptCount: job.filteredJobs?.length || 0,
+    scrapedCount: job.scrapedCount || 0,
+    keptCount: job.finalCount ?? job.keptCount ?? 0,
     sent: job.delivery?.sent ?? 0,
     failed: job.delivery?.failed ?? 0,
     error: job.error,
@@ -63,7 +63,7 @@ const present = async (schedule) => {
     const runs = await Job.find({ scheduleId: schedule.scheduleId })
         .sort({ createdAt: -1 })
         .limit(RUNS_PER_SCHEDULE)
-        .select('jobId status createdAt updatedAt scrapedJobs filteredJobs delivery error emptyReason')
+        .select('jobId status createdAt updatedAt scrapedCount keptCount finalCount delivery error emptyReason')
         .lean();
 
     return {

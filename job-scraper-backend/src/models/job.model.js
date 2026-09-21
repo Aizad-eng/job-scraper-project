@@ -70,11 +70,14 @@ const jobSchema = new mongoose.Schema(
                 launchAt: Date,
             },
         ],
-        scrapedJobs: { type: Array, default: [] },
-        filteredJobs: { type: Array, default: [] },
-        removedJobs: { type: Array, default: [] },
+        // Listings live in the Listing collection. The job keeps counts.
+        scrapedCount: { type: Number, default: 0 },     // everything the actors returned
+        keptCount: { type: Number, default: 0 },        // passed dedupe + rule filters
+        finalCount: { type: Number, default: 0 },       // still kept after every later stage
         // reason -> count, so the UI can say why rows went away
         removedByReason: { type: Object, default: {} },
+        // a short sample of removed listings, for debugging
+        removedSamples: { type: Array, default: [] },
         companiesCount: { type: Number, default: 0 },
         domainStats: { type: Object, default: null },
         salaryStats: { type: Object, default: null },
