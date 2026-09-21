@@ -119,6 +119,16 @@ export default function RunProgress({ jobId, status, onReset, onRerun, onOpenSch
                 <span className="stage-dot" aria-hidden="true" />
                 <span className="stage-label">
                   {stage.label}
+                  {stage.status === JOB_STATUS.CLASSIFYING &&
+                    state === STAGE_STATE.ACTIVE &&
+                    status.agencyCheck && (
+                      <em className="stage-sub">
+                        {status.agencyCheck.known} known from memory
+                        {status.agencyCheck.toCheck > 0 && (
+                          <> · checking {status.agencyCheck.checked} of {status.agencyCheck.toCheck} with ScrapingDog</>
+                        )}
+                      </em>
+                    )}
                   {stage.status === JOB_STATUS.SCRAPING &&
                     state === STAGE_STATE.ACTIVE &&
                     (status.totalRuns > 1 || status.pendingRuns > 0) && (

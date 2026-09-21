@@ -67,7 +67,7 @@ export const classifyOne = async (company, deps = {}) => {
 };
 
 // Returns a Map of company key -> classification.
-export const classifyCompanies = async (companies, deps = {}) => {
+export const classifyCompanies = async (companies, deps = {}, onProgress = null) => {
     const results = new Map();
 
     // batched parallel — fast, without firing 100 requests at once
@@ -77,9 +77,9 @@ export const classifyCompanies = async (companies, deps = {}) => {
             batch.map(async (company) => [company.key, await classifyOne(company, deps)])
         );
         classified.forEach(([key, result]) => results.set(key, result));
+        if (onProgress) await onProgress(results.size, companies.length);
 
-        // pause between batches to respect rate limits
-        if (i + AI_BATCH_SIZE < companies.length) {
+        if (AI_BATCH_DELAY_MS > 0 && i + AI_BATCH_SIZE < companies.length) {
             await new Promise((resolve) => setTimeout(resolve, AI_BATCH_DELAY_MS));
         }
     }

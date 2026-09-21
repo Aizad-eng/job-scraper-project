@@ -27,3 +27,5 @@ services:
         sync: false
       - key: MAX_ACTOR_RUNS
         value: "5"
+      - key: SCRAPINGDOG_CONCURRENCY
+        value: "5"

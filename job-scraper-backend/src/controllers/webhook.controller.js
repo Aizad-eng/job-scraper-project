@@ -316,14 +316,22 @@ const runPipeline = async (job) => {
         const useAi = inputs.agencyMode === AGENCY_MODE.FLAG || inputs.agencyMode === AGENCY_MODE.REMOVE;
         const useMemory = inputs.agencyMode !== AGENCY_MODE.OFF;
 
+        await setStatus(jobId, { companiesCount: companies.length });
+
         if (useMemory && companies.length) {
             await setStatus(jobId, { status: JOB_STATUS.CLASSIFYING });
             const verdicts = await getKnownVerdicts(companies.map((c) => c.key));
             const toCheck = useAi ? companies.filter((c) => !verdicts.has(c.key)) : [];
             console.log(`Job ${jobId}: ${companies.length} companies, ${verdicts.size} known from memory, ${toCheck.length} to check`);
+            await setStatus(jobId, { agencyCheck: { known: verdicts.size, toCheck: toCheck.length, checked: 0 } });
 
             if (toCheck.length) {
-                const fresh = await classifyCompanies(toCheck);
+                let lastWrite = 0;
+                const fresh = await classifyCompanies(toCheck, {}, async (checked, total) => {
+                    if (Date.now() - lastWrite < 5000 && checked < total) return;
+                    lastWrite = Date.now();
+                    await setStatus(jobId, { 'agencyCheck.checked': checked });
+                });
                 fresh.forEach((v, k) => verdicts.set(k, v));
                 try { await saveVerdicts(fresh); } catch (error) { console.error(`Job ${jobId}: could not save verdicts:`, error.message); }
             }

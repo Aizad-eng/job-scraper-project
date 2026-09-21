@@ -81,6 +81,7 @@ const jobSchema = new mongoose.Schema(
         companiesCount: { type: Number, default: 0 },
         domainStats: { type: Object, default: null },
         salaryStats: { type: Object, default: null },
+        agencyCheck: { type: Object, default: null },
         delivery: {
             state: { type: String, default: null },
             total: { type: Number, default: 0 },
