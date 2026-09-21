@@ -7,14 +7,23 @@ export const PRESETS = [
     {
         id: 'senior-leadership',
         label: 'Senior leadership (retained search)',
-        hint: 'Director, VP and C-level roles only. Whole-word matching on the job title, the usual title traps excluded (assistant to, art director, principal engineer, HR business partner, chief of staff…), VP titles at banks dropped, salary floor 150,000 with unknown pay kept.',
+        hint: 'Director, VP and C-level roles only (no "head of"). Whole-word matching on the job title, the usual title traps excluded (assistant to, art director, principal engineer, HR business partner, chief of staff…), VP titles at banks dropped, salary floor 150,000 with unknown pay kept.',
         apply: {
             filterKeywords: split(
-                'chief, ceo, cfo, coo, cto, cio, cmo, cro, chro, cpo, cso, ciso, cdo, cco, clo, cao, ' +
-                'president, vice president, vp, v.p., svp, evp, senior vice president, executive vice president, group vice president, ' +
-                'director, managing director, executive director, senior director, sr director, sr. director, group director, regional director, global director, ' +
-                'head of, global head, general manager, gm, country manager, managing partner, partner, principal, general counsel, controller, treasurer, ' +
-                'board member, non-executive director, founder in residence'
+                'chief, chief executive officer, chief executive, chief financial officer, chief operating officer, chief operations officer, ' +
+                'chief technology officer, chief technical officer, chief information officer, chief marketing officer, chief revenue officer, ' +
+                'chief commercial officer, chief sales officer, chief growth officer, chief customer officer, chief product officer, ' +
+                'chief people officer, chief human resources officer, chief talent officer, chief legal officer, chief compliance officer, ' +
+                'chief risk officer, chief strategy officer, chief security officer, chief information security officer, chief data officer, ' +
+                'chief digital officer, chief transformation officer, chief supply chain officer, chief procurement officer, chief medical officer, ' +
+                'chief scientific officer, chief administrative officer, chief accounting officer, chief investment officer, chief experience officer, ' +
+                'chief communications officer, chief sustainability officer, chief innovation officer, ' +
+                'ceo, cfo, coo, cto, cio, cmo, cro, cco, cso, cgo, cpo, chro, clo, ciso, cdo, cao, cxo, ' +
+                'president, executive vice president, senior vice president, group vice president, vice president, evp, svp, vp, v.p., ' +
+                'managing director, executive director, senior director, sr director, sr. director, group director, regional director, ' +
+                'global director, area director, division director, director, ' +
+                'general manager, gm, country manager, managing partner, partner, principal, general counsel, deputy general counsel, ' +
+                'controller, board member, non-executive director, founder in residence'
             ),
             filterMatchIn: ['title'],
             excludeWords: split(
