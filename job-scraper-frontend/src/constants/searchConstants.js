@@ -96,7 +96,7 @@ export const DEFAULT_FORM_VALUES = {
     ...(PRESETS.find((p) => p.id === DEFAULT_PRESET_ID)?.apply || {}),
 };
 
-export const JOBS_PER_KEYWORD_OPTIONS = [10, 25, 50, 100, 250, 500];
+export const JOBS_PER_KEYWORD_OPTIONS = [10, 25, 50, 100, 250, 500, 1000];
 
 export const FIELD_HINTS = {
     keywords: 'Each title runs as its own search on every board you pick. Press Enter after each one.',
