@@ -8,7 +8,7 @@ import {
   PLATFORMS,
   DEFAULT_FORM_VALUES,
   DEFAULT_PRESET_ID,
-  JOBS_PER_KEYWORD_OPTIONS,
+  JOBS_PER_KEYWORD_MAX,
   FIELD_HINTS,
   POSTED_WITHIN_OPTIONS,
   MATCH_IN_OPTIONS,
@@ -200,20 +200,23 @@ export default function SearchForm({
             <label className="field-label" htmlFor="jobsPerKeyword">
               Listings per title
             </label>
-            <select
+            <input
               id="jobsPerKeyword"
+              type="number"
+              min="1"
+              max={JOBS_PER_KEYWORD_MAX}
+              step="1"
               className="text-input"
               value={values.jobsPerKeyword}
-              onChange={(event) =>
-                setField("jobsPerKeyword", Number(event.target.value))
+              onChange={(event) => setField("jobsPerKeyword", event.target.value)}
+              onBlur={() =>
+                setField(
+                  "jobsPerKeyword",
+                  Math.min(Math.max(Math.round(Number(values.jobsPerKeyword)) || 25, 1), JOBS_PER_KEYWORD_MAX),
+                )
               }
-            >
-              {JOBS_PER_KEYWORD_OPTIONS.map((option) => (
-                <option key={option} value={option}>
-                  {option}
-                </option>
-              ))}
-            </select>
+            />
+            <p className="field-hint below">{FIELD_HINTS.jobsPerKeyword}</p>
           </div>
 
           <div className="field">

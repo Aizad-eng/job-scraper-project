@@ -32,7 +32,7 @@ export const parseInputs = (body = {}) => {
         keywords: cleanList(body.keywords),
         location: String(body.location || '').trim(),
         platforms: cleanList(body.platforms).filter((p) => Object.values(PLATFORMS).includes(p)),
-        jobsPerKeyword: Math.min(Math.max(Number(body.jobsPerKeyword) || 25, 1), 1000),
+        jobsPerKeyword: Math.min(Math.max(Math.round(Number(body.jobsPerKeyword)) || 25, 1), 5000),
         postedWithin: body.postedWithin || 'any',
         maxJobsPerCompany: Math.min(Math.max(Number(body.maxJobsPerCompany) || 0, 0), 50),
 

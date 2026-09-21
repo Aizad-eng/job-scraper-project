@@ -1,6 +1,5 @@
 import { useState } from "react";
 import {
-  JOBS_PER_KEYWORD_OPTIONS,
   POSTED_WITHIN_OPTIONS,
   AGENCY_MODE_OPTIONS,
   DELIVERY_MODE_OPTIONS,
@@ -95,7 +94,7 @@ export default function BulkEditor({ count, onApply, onClose, busy }) {
       </p>
 
       <div className="bulk-grid">
-        {select("jobsPerKeyword", JOBS_PER_KEYWORD_OPTIONS, "Listings per title")}
+        {number("jobsPerKeyword", "Listings per title", "Leave unchanged (1–5000)")}
         {select("postedWithin", POSTED_WITHIN_OPTIONS, "Posted within")}
         {select("agencyMode", AGENCY_MODE_OPTIONS, "Staffing agencies")}
         {select("deliveryMode", DELIVERY_MODE_OPTIONS, "Send")}

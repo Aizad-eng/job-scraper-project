@@ -85,7 +85,7 @@ export const describeRun = (values) => {
     const boards = values.platforms.length;
     if (!titles || !boards) return '';
     const runs = titles * boards;
-    const listings = runs * Number(values.jobsPerKeyword || 0);
+    const listings = runs * (Math.round(Number(values.jobsPerKeyword)) || 0);
     return `${titles} ${titles === 1 ? 'title' : 'titles'} × ${boards} ${boards === 1 ? 'board' : 'boards'} = ${runs} ${runs === 1 ? 'scrape' : 'scrapes'}, up to ${listings.toLocaleString()} listings`;
 };
 

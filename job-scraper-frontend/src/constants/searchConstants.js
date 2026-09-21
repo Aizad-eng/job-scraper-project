@@ -96,9 +96,10 @@ export const DEFAULT_FORM_VALUES = {
     ...(PRESETS.find((p) => p.id === DEFAULT_PRESET_ID)?.apply || {}),
 };
 
-export const JOBS_PER_KEYWORD_OPTIONS = [10, 25, 50, 100, 250, 500, 1000];
+export const JOBS_PER_KEYWORD_MAX = 5000;
 
 export const FIELD_HINTS = {
+    jobsPerKeyword: 'How many listings each title search may return, per board. Any number up to 5000.',
     keywords: 'Each title runs as its own search on every board you pick. Press Enter after each one.',
     location: 'City, state or country. Leave empty for anywhere.',
     companySizes: 'Pick the bands you want. Nothing selected means any size.',
