@@ -41,7 +41,7 @@ const shortUrl = (url = "") => {
   }
 };
 
-export default function RunProgress({ jobId, status, onReset, onRerun, onOpenSchedules }) {
+export default function RunProgress({ jobId, status, onReset, onRerun, onReprocess, reprocessBusy, onOpenSchedules }) {
   // ticks once a second while the run is live; elapsed is derived from it
   const [now, setNow] = useState(() => Date.now());
 
@@ -106,6 +106,7 @@ export default function RunProgress({ jobId, status, onReset, onRerun, onOpenSch
                 </button>
               </>
             )}
+            {status.reprocessedFrom && <> · reprocessed from run {status.reprocessedFrom.slice(0, 8)}</>}
           </p>
         </div>
         <button className="ghost" type="button" onClick={onReset}>
@@ -127,7 +128,7 @@ export default function RunProgress({ jobId, status, onReset, onRerun, onOpenSch
             const showProgress =
               state === STAGE_STATE.ACTIVE &&
               status.progress &&
-              stage.status !== JOB_STATUS.SCRAPING;
+              (stage.status !== JOB_STATUS.SCRAPING || status.reprocessedFrom);
             const pct =
               showProgress && status.progress.total > 0
                 ? Math.min(100, Math.round((status.progress.done / status.progress.total) * 100))
@@ -428,6 +429,17 @@ export default function RunProgress({ jobId, status, onReset, onRerun, onOpenSch
           <button className="primary" type="button" onClick={onRerun}>
             Run again with these settings
           </button>
+          {status.importableRuns > 0 && (
+            <button
+              className="ghost"
+              type="button"
+              disabled={reprocessBusy}
+              onClick={onReprocess}
+              title="Pulls the datasets these scrapes already produced from Apify and runs the filters, checks and delivery again. No new scraping."
+            >
+              {reprocessBusy ? "Starting…" : `Reprocess from Apify (${status.importableRuns} datasets, no re-scrape)`}
+            </button>
+          )}
           <button className="ghost" type="button" onClick={onReset}>
             New search
           </button>

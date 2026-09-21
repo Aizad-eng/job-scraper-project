@@ -32,13 +32,15 @@ export const getJobStatus = async (req, res) => {
         res.json({
             jobId: job.jobId,
             scheduleId: job.scheduleId || null,
+            reprocessedFrom: job.reprocessedFrom || null,
+            importableRuns: (job.apifyRuns || []).filter((r) => r.runId && String(r.status).toUpperCase() === 'SUCCEEDED').length,
             status: job.status,
             statusLabel: JOB_STATUS_LABELS[job.status] || job.status,
             isDone: job.status === JOB_STATUS.DONE,
             isFailed: job.status === JOB_STATUS.FAILED,
             isEmpty: job.status === JOB_STATUS.EMPTY,
             totalRuns: job.apifyRuns?.length || 0,
-            completedRuns: (job.apifyRuns || []).filter((r) => r.status !== 'RUNNING').length,
+            completedRuns: (job.apifyRuns || []).filter((r) => r.status !== 'RUNNING' && r.status !== 'IMPORTING').length,
             runningRuns: (job.apifyRuns || []).filter((r) => r.status === 'RUNNING').length,
             pendingRuns: job.pendingLaunches?.length || 0,
             nextLaunchAt: job.pendingLaunches?.length

@@ -7,6 +7,8 @@ const jobSchema = new mongoose.Schema(
         // set when a schedule started this run
         scheduleId: { type: String, default: null, index: true },
         skipAlreadySent: { type: Boolean, default: false },
+        // set when this run re-used another run's Apify datasets
+        reprocessedFrom: { type: String, default: null },
         status: {
             type: String,
             enum: Object.values(JOB_STATUS),

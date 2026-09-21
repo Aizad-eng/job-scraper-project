@@ -96,14 +96,19 @@ const ingestPage = async (job, run, page) => {
 
 // Records how a run ended: ingests its results (on success) and marks it.
 // Shared by the Apify webhook and the watchdog. Returns the jobId, or null.
-export const applyRunOutcome = async (runId, runStatus, { fetchPaged = fetchRunResultsPaged } = {}) => {
-    const job = await Job.findOne({ 'apifyRuns.runId': runId }).select('jobId scheduleId inputs apifyRuns').lean();
+export const applyRunOutcome = async (runId, runStatus, { fetchPaged = fetchRunResultsPaged, jobId = null } = {}) => {
+    // the same Apify run can appear on several jobs (reprocessing); pick the
+    // one where it is still open, or the job named by the caller
+    const filter = jobId
+        ? { jobId, 'apifyRuns.runId': runId }
+        : { apifyRuns: { $elemMatch: { runId, status: { $in: ['RUNNING', 'IMPORTING'] } } } };
+    const job = await Job.findOne(filter).select('jobId scheduleId inputs apifyRuns').lean();
     if (!job) {
         console.warn(`No job found for runId ${runId}`);
         return null;
     }
     const run = job.apifyRuns.find((r) => r.runId === runId);
-    if (!run || run.status !== 'RUNNING') return job.jobId;   // already handled
+    if (!run || (run.status !== 'RUNNING' && run.status !== 'IMPORTING')) return job.jobId;   // already handled
 
     if (runStatus === 'SUCCEEDED') {
         const total = await fetchPaged(runId, (page) => ingestPage(job, run, page));

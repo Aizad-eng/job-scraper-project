@@ -7,6 +7,7 @@ import Companies from "./components/Companies.jsx";
 import {
   startScrape,
   fetchJobStatus,
+  reprocessJob,
   createSchedule,
   updateSchedule,
 } from "./helpers/apiHelpers.js";
@@ -168,6 +169,30 @@ export default function App() {
     openSearch();
   };
 
+  const [reprocessBusy, setReprocessBusy] = useState(false);
+  const handleReprocess = async () => {
+    if (!jobId) return;
+    setReprocessBusy(true);
+    setSubmitError("");
+    try {
+      const result = await reprocessJob(jobId);
+      rememberRun({
+        jobId: result.jobId,
+        keywords: status?.inputs?.keywords || [],
+        location: status?.inputs?.location || "",
+        platforms: status?.inputs?.platforms || [],
+        createdAt: new Date().toISOString(),
+        status: null,
+      });
+      setRecentRuns(getRecentRuns());
+      openJob(result.jobId);
+    } catch (error) {
+      setSubmitError(error.message);
+    } finally {
+      setReprocessBusy(false);
+    }
+  };
+
   const handleRerun = () => {
     if (status?.inputs) setPrefill(status.inputs);
     setEditingSchedule(null);
@@ -214,12 +239,14 @@ export default function App() {
 
       {jobId ? (
         <>
-          {submitError && !status && <p className="banner-error">{submitError}</p>}
+          {submitError && <p className="banner-error">{submitError}</p>}
           <RunProgress
             jobId={jobId}
             status={status}
             onReset={handleReset}
             onRerun={handleRerun}
+            onReprocess={handleReprocess}
+            reprocessBusy={reprocessBusy}
             onOpenSchedules={openSchedules}
           />
         </>

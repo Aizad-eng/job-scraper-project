@@ -1,6 +1,7 @@
 import express from 'express';
 import { getJobStatus, startScrape } from '../controllers/scrape.controller.js';
 import { testWebhook } from '../controllers/testWebhook.controller.js';
+import { reprocessJob } from '../controllers/reprocess.controller.js';
 import { requireAccessKey } from '../middleware/auth.js';
 
 const router = express.Router();
@@ -11,5 +12,6 @@ const router = express.Router();
 router.post('/scrape', requireAccessKey, startScrape);
 router.get('/job-status/:jobId', requireAccessKey, getJobStatus);
 router.post('/test-webhook', requireAccessKey, testWebhook);
+router.post('/jobs/:jobId/reprocess', requireAccessKey, reprocessJob);
 
 export default router;

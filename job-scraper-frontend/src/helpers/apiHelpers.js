@@ -116,3 +116,8 @@ export const bulkUpdateSchedules = (payload) =>
     request('/schedules/bulk', { method: 'POST', body: JSON.stringify(payload) });
 
 export const fetchConfig = () => request('/config');
+
+// Re-run a job's pipeline on the Apify datasets it already produced (or on
+// pasted run ids) without scraping again.
+export const reprocessJob = (jobId, runIds = []) =>
+    request(`/jobs/${jobId}/reprocess`, { method: 'POST', body: JSON.stringify({ runIds }) });

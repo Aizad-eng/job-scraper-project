@@ -155,7 +155,7 @@ Runs on `http://localhost:5173` and proxies `/api` to `http://localhost:5000` (s
    **Don't send the same company again for N days** (default 21) is the cooldown: once a company has been sent to the webhook, every run and schedule holds it back for that long, even if it posts more jobs. Set 0 to turn it off for a search. The Companies tab shows when each company was last sent and has an *allow again now* link.
 5. **Repeat** — *Run once now*, or *Run on a schedule*: a name, how often (every day / every N days / chosen weekdays), the time of day, and whether to skip listings already sent. The timezone is taken from the browser.
 
-The progress page shows each stage with counts, why listings were removed, the settings used, and lets you run again with the same settings.
+The progress page shows each stage with counts and live progress, why listings were removed, the settings used, and lets you run again with the same settings. **Reprocess from Apify** on a finished or failed run creates a new run with the same settings and pulls the datasets the original scrapes already produced straight from Apify (no actors started, no scraping cost), then filters, checks and delivers as usual. The API form, `POST /api/jobs/:jobId/reprocess` with `{ "runIds": [...] }`, accepts any Apify run ids from the LinkedIn or Indeed actor.
 
 ### Schedules
 
