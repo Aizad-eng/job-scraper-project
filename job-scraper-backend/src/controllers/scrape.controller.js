@@ -54,6 +54,8 @@ export const getJobStatus = async (req, res) => {
             domainStats: job.domainStats || null,
             salaryStats: job.salaryStats || null,
             agencyCheck: job.agencyCheck || null,
+            progress: job.progress || null,
+            stageTimes: job.stageTimes || {},
             delivery: job.delivery || null,
             emptyReason: job.emptyReason,
             error: job.error,

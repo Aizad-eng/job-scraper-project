@@ -131,3 +131,23 @@ export const formatAgo = (iso) => {
     if (days === 1) return 'yesterday';
     return `${days} days ago`;
 };
+
+export const formatDuration = (startIso, endIso) => {
+    if (!startIso) return '';
+    const ms = (endIso ? new Date(endIso).getTime() : Date.now()) - new Date(startIso).getTime();
+    const s = Math.max(0, Math.floor(ms / 1000));
+    if (s < 60) return `${s}s`;
+    const m = Math.floor(s / 60);
+    if (m < 60) return `${m}m ${s % 60}s`;
+    return `${Math.floor(m / 60)}h ${m % 60}m`;
+};
+
+// "12s ago", "3m ago"
+export const formatAgoShort = (iso, now = Date.now()) => {
+    if (!iso) return '';
+    const s = Math.max(0, Math.floor((now - new Date(iso).getTime()) / 1000));
+    if (s < 60) return `${s}s ago`;
+    const m = Math.floor(s / 60);
+    if (m < 60) return `${m}m ago`;
+    return `${Math.floor(m / 60)}h ${m % 60}m ago`;
+};

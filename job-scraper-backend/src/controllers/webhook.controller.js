@@ -216,7 +216,19 @@ export const finishJobIfComplete = async (jobId) => {
 
 const setStatus = (jobId, fields) => Job.updateOne({ jobId }, { $set: fields });
 
-const finishEmpty = (jobId, reason) => setStatus(jobId, { status: JOB_STATUS.EMPTY, emptyReason: reason });
+// Live progress for the run page. Throttled to one write every 3 s unless done.
+const progressClock = new Map();
+const setProgress = async (jobId, label, done, total, { force = false } = {}) => {
+    const last = progressClock.get(jobId) || 0;
+    if (!force && done < total && Date.now() - last < 3000) return;
+    progressClock.set(jobId, Date.now());
+    await Job.updateOne({ jobId }, { $set: { progress: { label, done, total, updatedAt: new Date() } } });
+};
+
+const stageStart = (jobId, stage) => Job.updateOne({ jobId }, { $set: { [`stageTimes.${stage}.startedAt`]: new Date() } });
+const stageEnd = (jobId, stage) => Job.updateOne({ jobId }, { $set: { [`stageTimes.${stage}.endedAt`]: new Date() } });
+
+const finishEmpty = (jobId, reason) => setStatus(jobId, { status: JOB_STATUS.EMPTY, emptyReason: reason, progress: null });
 
 // Iterates kept listings in batches (full documents).
 const forEachKeptBatch = async (jobId, handler, { projection = null, size = BATCH } = {}) => {
@@ -274,11 +286,15 @@ const runPipeline = async (job) => {
             return;
         }
         console.log(`Job ${jobId}: ${counts.scrapedCount} scraped, ${counts.keptCount} kept after rules`);
+        await stageEnd(jobId, 'scraping');
+        await stageStart(jobId, 'filtering');
 
         // ---- DOMAINS, SALARIES, TITLES (per batch, written back) ----
         const domainStats = {};
         const salaryStats = {};
         const addStats = (into, from) => Object.entries(from || {}).forEach(([k, v]) => { into[k] = (into[k] || 0) + (Number(v) || 0); });
+        let enriched = 0;
+        await setProgress(jobId, 'Domains, salaries and titles', 0, counts.keptCount, { force: true });
 
         await forEachKeptBatch(jobId, async (docs) => {
             const datas = docs.map((d) => d.data);
@@ -301,7 +317,10 @@ const runPipeline = async (job) => {
                 const ids = docs.filter((d) => removedTitles.has(`${d.data.companyName || null}|${d.data.title || null}`)).map((d) => d._id);
                 await dropListings(jobId, ids, REMOVAL_REASON.SALARY, removed);
             }
+            enriched += docs.length;
+            await setProgress(jobId, 'Domains, salaries and titles', enriched, counts.keptCount);
         });
+        await setProgress(jobId, 'Domains, salaries and titles', counts.keptCount, counts.keptCount, { force: true });
         await setStatus(jobId, { domainStats, salaryStats });
         console.log(`Job ${jobId}: domains ${JSON.stringify(domainStats)} salaries ${JSON.stringify(salaryStats)}`);
 
@@ -317,20 +336,22 @@ const runPipeline = async (job) => {
         const useMemory = inputs.agencyMode !== AGENCY_MODE.OFF;
 
         await setStatus(jobId, { companiesCount: companies.length });
+        await stageEnd(jobId, 'filtering');
 
         if (useMemory && companies.length) {
             await setStatus(jobId, { status: JOB_STATUS.CLASSIFYING });
+            await stageStart(jobId, 'classifying');
+            await setProgress(jobId, 'Looking companies up in memory', 0, companies.length, { force: true });
             const verdicts = await getKnownVerdicts(companies.map((c) => c.key));
             const toCheck = useAi ? companies.filter((c) => !verdicts.has(c.key)) : [];
             console.log(`Job ${jobId}: ${companies.length} companies, ${verdicts.size} known from memory, ${toCheck.length} to check`);
             await setStatus(jobId, { agencyCheck: { known: verdicts.size, toCheck: toCheck.length, checked: 0 } });
+            await setProgress(jobId, `Checking companies with ScrapingDog (${verdicts.size} already known)`, 0, toCheck.length, { force: true });
 
             if (toCheck.length) {
-                let lastWrite = 0;
                 const fresh = await classifyCompanies(toCheck, {}, async (checked, total) => {
-                    if (Date.now() - lastWrite < 5000 && checked < total) return;
-                    lastWrite = Date.now();
-                    await setStatus(jobId, { 'agencyCheck.checked': checked });
+                    await setProgress(jobId, `Checking companies with ScrapingDog (${verdicts.size} already known)`, checked, total);
+                    if (checked === total) await setStatus(jobId, { 'agencyCheck.checked': checked });
                 });
                 fresh.forEach((v, k) => verdicts.set(k, v));
                 try { await saveVerdicts(fresh); } catch (error) { console.error(`Job ${jobId}: could not save verdicts:`, error.message); }
@@ -364,6 +385,7 @@ const runPipeline = async (job) => {
             await dropListings(jobId, dropKnown, REMOVAL_REASON.KNOWN_AGENCY);
             await dropListings(jobId, dropAi, REMOVAL_REASON.AI_AGENCY);
             console.log(`Job ${jobId}: agencies dropped ${dropKnown.length + dropAi.length}`);
+            await stageEnd(jobId, 'classifying');
         }
 
         // ---- PER-COMPANY CAP ----
@@ -392,6 +414,8 @@ const runPipeline = async (job) => {
         }
 
         // ---- DELIVERY (batched) ----
+        await stageStart(jobId, 'delivering');
+        await setProgress(jobId, 'Sending rows to your webhook', 0, finalCount, { force: true });
         await setStatus(jobId, {
             status: JOB_STATUS.DELIVERING,
             delivery: { state: DELIVERY_STATE.SENDING, total: 0, sent: 0, failed: 0, lastError: null, finishedAt: null },
@@ -442,6 +466,7 @@ const runPipeline = async (job) => {
             totals.sent += outcome.sent;
             totals.failed += outcome.failed;
             if (outcome.lastError) totals.lastError = outcome.lastError;
+            await setProgress(jobId, 'Sending rows to your webhook', totals.sent + totals.failed, finalCount);
 
             if (outcome.sent > 0) {
                 const failedIdx = new Set(outcome.failedIndexes);
@@ -477,7 +502,9 @@ const runPipeline = async (job) => {
         }
 
         const allFailed = totals.sent === 0 && totals.failed > 0;
+        await stageEnd(jobId, 'delivering');
         await setStatus(jobId, {
+            progress: null,
             status: allFailed ? JOB_STATUS.FAILED : JOB_STATUS.DONE,
             error: allFailed ? `The webhook rejected every request. Last error: ${totals.lastError}` : null,
             delivery: {

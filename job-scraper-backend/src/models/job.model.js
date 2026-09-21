@@ -82,6 +82,10 @@ const jobSchema = new mongoose.Schema(
         domainStats: { type: Object, default: null },
         salaryStats: { type: Object, default: null },
         agencyCheck: { type: Object, default: null },
+        // what the pipeline is doing right now: { label, done, total, updatedAt }
+        progress: { type: Object, default: null },
+        // when each stage started / ended, for per-stage durations
+        stageTimes: { type: Object, default: {} },
         delivery: {
             state: { type: String, default: null },
             total: { type: Number, default: 0 },

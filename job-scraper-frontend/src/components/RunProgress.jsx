@@ -12,8 +12,17 @@ import {
   getStageState,
   formatElapsed,
   formatUntil,
+  formatDuration,
+  formatAgoShort,
   visibleStages,
 } from "../helpers/formatHelpers.js";
+
+const STAGE_TIME_KEY = {
+  scraping: "scraping",
+  filtering: "filtering",
+  classifying: "classifying",
+  delivering: "delivering",
+};
 
 const sizeLabel = (values = []) => {
   if (!values.length) return "Any size";
@@ -114,11 +123,51 @@ export default function RunProgress({ jobId, status, onReset, onRerun, onOpenSch
               count !== null &&
               count !== undefined;
 
+            const times = status.stageTimes?.[STAGE_TIME_KEY[stage.status]];
+            const showProgress =
+              state === STAGE_STATE.ACTIVE &&
+              status.progress &&
+              stage.status !== JOB_STATUS.SCRAPING;
+            const pct =
+              showProgress && status.progress.total > 0
+                ? Math.min(100, Math.round((status.progress.done / status.progress.total) * 100))
+                : null;
+            const stalled =
+              showProgress && status.progress.updatedAt && now - new Date(status.progress.updatedAt).getTime() > 10 * 60 * 1000;
+
             return (
               <li key={stage.status} className={`stage is-${state}`}>
                 <span className="stage-dot" aria-hidden="true" />
                 <span className="stage-label">
                   {stage.label}
+                  {times?.startedAt && (state === STAGE_STATE.DONE || state === STAGE_STATE.ACTIVE) && (
+                    <span className="stage-time">
+                      {state === STAGE_STATE.DONE && times.endedAt
+                        ? `took ${formatDuration(times.startedAt, times.endedAt)}`
+                        : `running ${formatDuration(times.startedAt, new Date(now).toISOString())}`}
+                    </span>
+                  )}
+                  {showProgress && (
+                    <span className="stage-progress">
+                      <em className="stage-sub">
+                        {status.progress.label}
+                        {status.progress.total > 0 && (
+                          <> · {status.progress.done.toLocaleString()} of {status.progress.total.toLocaleString()}{pct !== null && ` (${pct}%)`}</>
+                        )}
+                        {status.progress.updatedAt && (
+                          <span className={stalled ? "is-stalled" : ""}>
+                            {" · "}updated {formatAgoShort(status.progress.updatedAt, now)}
+                            {stalled && " — no update for a while, check the server logs"}
+                          </span>
+                        )}
+                      </em>
+                      {pct !== null && (
+                        <span className="bar" aria-hidden="true">
+                          <span className="bar-fill" style={{ width: `${pct}%` }} />
+                        </span>
+                      )}
+                    </span>
+                  )}
                   {stage.status === JOB_STATUS.CLASSIFYING &&
                     state === STAGE_STATE.ACTIVE &&
                     status.agencyCheck && (

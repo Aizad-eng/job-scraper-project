@@ -106,6 +106,7 @@ export const launchSearch = async (inputs, { scheduleId = null, skipAlreadySent 
         skipAlreadySent,
         pendingLaunches,
         apifyRuns: [],
+        stageTimes: { scraping: { startedAt: new Date() } },
     });
 
     await launchDueSearches({ onlyJobId: jobId });
