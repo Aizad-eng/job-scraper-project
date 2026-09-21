@@ -160,6 +160,8 @@ The **Schedules** tab lists every saved schedule with its next run, last run, an
 
 **Bulk changes.** Tick the schedules you want (or *Select all*, *active*, *paused*), then **Activate**, **Deactivate**, **Run now** or **Delete** them together, or **Change settings** to set listings per title, posted-within, staffing-agency mode, row mode, cooldown, keyword spacing, salary range, run time, already-sent handling or the webhook URL on all of them at once. Only the fields you set are changed; everything else on each schedule stays. A schedule that rejects the change (for example an invalid webhook URL) is reported by name and left untouched.
 
+**Concurrency cap.** Never more than **5 actor runs in flight** across every search and schedule together. Every keyword × board search is queued on its job and started as slots free up, oldest job first; *Actor runs at once* (step 1, default 5, max 5) lets a search use fewer. A watchdog checks any run still marked running after 5 minutes directly with Apify, so a callback that never arrived (server asleep, stale `PUBLIC_BASE_URL`) cannot hold a slot or stall a job. The run page shows running / queued counts.
+
 **Keyword spacing.** A schedule can space its keyword searches out: *Minutes between keyword searches* (default 20 for schedules, 0 for one-off runs). The first keyword starts at the scheduled time on every board; each next keyword starts that many minutes later. The queued searches live on the job (`pendingLaunches`) and the same 30-second tick launches them when due, so a restart in between loses nothing. Filtering and delivery happen once, after the last search has finished. The run page shows how many are queued and when the next starts.
 
 How it runs: the backend checks every 30 seconds for schedules whose next run time has passed and starts them one at a time. If the server was down at the scheduled time, the run starts as soon as it is back. Each schedule remembers the job URLs (or company domains, in company mode) it has delivered for 120 days; a scheduled run drops those before sending and reports them as *Already sent by this schedule*.
@@ -261,7 +263,8 @@ job-scraper-backend/
 │   ├── webhook.controller.js       Apify callback + the whole pipeline
 │   └── testWebhook.controller.js   Sends one sample row to a webhook
 ├── src/services/
-│   ├── search.service.js           Input validation + launching Apify runs (shared)
+│   ├── search.service.js           Input validation + queueing a search's runs (shared)
+│   ├── launchQueue.service.js      Global 5-run cap: starts queued searches as slots free
 │   ├── scheduler.service.js        30-second tick that starts due schedules
 │   ├── apify.service.js            Triggers actors, fetches results (paginated)
 │   ├── filter.service.js           Rule filters and per-company cap

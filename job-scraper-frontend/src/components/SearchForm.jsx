@@ -9,6 +9,7 @@ import {
   DEFAULT_FORM_VALUES,
   DEFAULT_PRESET_ID,
   JOBS_PER_KEYWORD_MAX,
+  MAX_CONCURRENT_RUNS,
   FIELD_HINTS,
   POSTED_WITHIN_OPTIONS,
   MATCH_IN_OPTIONS,
@@ -217,6 +218,29 @@ export default function SearchForm({
               }
             />
             <p className="field-hint below">{FIELD_HINTS.jobsPerKeyword}</p>
+          </div>
+
+          <div className="field">
+            <label className="field-label" htmlFor="maxConcurrentRuns">
+              Actor runs at once
+            </label>
+            <input
+              id="maxConcurrentRuns"
+              type="number"
+              min="1"
+              max={MAX_CONCURRENT_RUNS}
+              step="1"
+              className="text-input"
+              value={values.maxConcurrentRuns}
+              onChange={(event) => setField("maxConcurrentRuns", event.target.value)}
+              onBlur={() =>
+                setField(
+                  "maxConcurrentRuns",
+                  Math.min(Math.max(Math.round(Number(values.maxConcurrentRuns)) || MAX_CONCURRENT_RUNS, 1), MAX_CONCURRENT_RUNS),
+                )
+              }
+            />
+            <p className="field-hint below">{FIELD_HINTS.maxConcurrentRuns}</p>
           </div>
 
           <div className="field">

@@ -1,9 +1,8 @@
 import { randomUUID } from 'crypto';
 import Schedule from '../models/schedule.model.js';
-import Job from '../models/job.model.js';
-import { launchSearch, launchKeyword, callbackUrl } from './search.service.js';
-import { finishJobIfComplete } from '../controllers/webhook.controller.js';
-import { JOB_STATUS } from '../constants/apifyConstants.js';
+import { launchSearch } from './search.service.js';
+import { launchDueSearches } from './launchQueue.service.js';
+import { finishJobIfComplete, reconcileStaleRuns } from '../controllers/webhook.controller.js';
 import { computeNextRun } from '../helpers/scheduleHelpers.js';
 import { SCHEDULER_TICK_MS } from '../constants/scheduleConstants.js';
 
@@ -49,47 +48,23 @@ export const runSchedule = async (schedule, { manual = false } = {}) => {
     }
 };
 
-// Launches queued keyword searches whose time has come (spaced launches).
-const launchDueSearches = async () => {
-    const now = new Date();
-    const jobs = await Job.find(
-        { status: JOB_STATUS.SCRAPING, pendingLaunches: { $elemMatch: { launchAt: { $lte: now } } } }
-    ).select('jobId inputs pendingLaunches').lean();
-
-    for (const job of jobs) {
-        const due = job.pendingLaunches.filter((p) => new Date(p.launchAt) <= now);
-        // group by keyword so both boards for a keyword go together
-        const keywords = [...new Set(due.map((p) => p.keyword))];
-
-        for (const keyword of keywords) {
-            // claim: remove this keyword's pending entries first, so a slow
-            // launch can never be started twice by the next tick
-            const claimed = await Job.findOneAndUpdate(
-                { jobId: job.jobId, 'pendingLaunches.keyword': keyword },
-                { $pull: { pendingLaunches: { keyword } } },
-                { returnDocument: 'before' }
-            );
-            if (!claimed) continue;
-
-            const platforms = claimed.pendingLaunches.filter((p) => p.keyword === keyword).map((p) => p.platform);
-            const entries = await launchKeyword({ ...job.inputs, platforms }, keyword, callbackUrl());
-            await Job.updateOne({ jobId: job.jobId }, { $push: { apifyRuns: { $each: entries } } });
-            console.log(`Job ${job.jobId}: launched "${keyword}" on ${platforms.join(', ')} (spaced)`);
-
-            // a launch that failed outright sends no webhook; check completion here
-            if (entries.every((e) => e.status === 'FAILED')) {
-                await finishJobIfComplete(job.jobId).catch((error) =>
-                    console.error(`Job ${job.jobId}: finish check failed:`, error.message)
-                );
-            }
-        }
-    }
-};
-
 const tick = async () => {
     const now = new Date();
 
-    await launchDueSearches().catch((error) => console.error('Spaced launch failed:', error.message));
+    // 1. free slots held by runs whose webhook never came
+    await reconcileStaleRuns().catch((error) => console.error('Watchdog failed:', error.message));
+
+    // 2. start queued searches as slots allow
+    try {
+        const touched = await launchDueSearches();
+        for (const jobId of touched) {
+            await finishJobIfComplete(jobId).catch((error) => console.error(`Job ${jobId}: finish check failed:`, error.message));
+        }
+    } catch (error) {
+        console.error('Queued launch failed:', error.message);
+    }
+
+    // 3. schedules due now
 
     // Claim one due schedule at a time so a slow launch never double-fires.
     for (;;) {

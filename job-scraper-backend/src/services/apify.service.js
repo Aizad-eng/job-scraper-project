@@ -89,3 +89,9 @@ export const fetchRunResults = async (runId) => {
 
     return items;
 };
+
+// Current status of a run, straight from Apify (for the watchdog).
+export const fetchRunStatus = async (runId) => {
+    const response = await axios.get(`${APIFY_BASE_URL}/actor-runs/${runId}`, { headers: apifyHeaders() });
+    return response.data?.data?.status || null;
+};

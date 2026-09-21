@@ -49,6 +49,8 @@ const jobSchema = new mongoose.Schema(
             includeNoSalary: { type: Boolean, default: true },
             // minutes between keyword searches (0 = launch everything at once)
             launchSpacingMinutes: { type: Number, default: 0 },
+            // actor runs this search may have in flight at once (global cap still applies)
+            maxConcurrentRuns: { type: Number, default: 5 },
         },
         apifyRuns: [
             {
@@ -56,6 +58,8 @@ const jobSchema = new mongoose.Schema(
                 platform: String,
                 keyword: String,
                 status: String,
+                error: String,
+                startedAt: Date,
             },
         ],
         // keyword × platform searches not launched yet (spaced launches)

@@ -124,8 +124,14 @@ export default function RunProgress({ jobId, status, onReset, onRerun, onOpenSch
                     (status.totalRuns > 1 || status.pendingRuns > 0) && (
                       <em className="stage-sub">
                         {status.completedRuns} of {status.totalRuns + (status.pendingRuns || 0)} scrapes finished
-                        {status.pendingRuns > 0 && status.nextLaunchAt && (
-                          <> · {status.pendingRuns} queued, next starts {formatUntil(status.nextLaunchAt)}</>
+                        {status.runningRuns > 0 && <> · {status.runningRuns} running</>}
+                        {status.pendingRuns > 0 && (
+                          <>
+                            {" · "}{status.pendingRuns} queued
+                            {status.nextLaunchAt && new Date(status.nextLaunchAt).getTime() > now
+                              ? <>, next starts {formatUntil(status.nextLaunchAt)}</>
+                              : <>, waiting for a free slot</>}
+                          </>
                         )}
                       </em>
                     )}
@@ -325,6 +331,12 @@ export default function RunProgress({ jobId, status, onReset, onRerun, onOpenSch
               <div>
                 <dt>Bank VPs</dt>
                 <dd>Dropped</dd>
+              </div>
+            )}
+            {status.inputs.maxConcurrentRuns > 0 && (
+              <div>
+                <dt>Actor runs at once</dt>
+                <dd>{status.inputs.maxConcurrentRuns}</dd>
               </div>
             )}
             {status.inputs.launchSpacingMinutes > 0 && (

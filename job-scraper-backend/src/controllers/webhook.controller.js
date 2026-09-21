@@ -1,6 +1,8 @@
 import Job from '../models/job.model.js';
 import DeliveredListing from '../models/deliveredListing.model.js';
-import { fetchRunResults } from '../services/apify.service.js';
+import { fetchRunResults, fetchRunStatus } from '../services/apify.service.js';
+import { launchDueSearches } from '../services/launchQueue.service.js';
+import { STALE_RUN_CHECK_MINUTES } from '../constants/apifyConstants.js';
 import { JOB_STATUS, APIFY_TERMINAL_STATUSES } from '../constants/apifyConstants.js';
 import { AGENCY_MODE, REMOVAL_REASON } from '../constants/filterConstants.js';
 import { DELIVERY_STATE } from '../constants/deliveryConstants.js';
@@ -27,52 +29,103 @@ const EVENT_TO_STATUS = {
     'ACTOR.RUN.TIMED_OUT': 'TIMED-OUT',
 };
 
+// Records how a run ended: stores its results (on success) and marks it.
+// Shared by the Apify webhook and the watchdog. Returns the jobId, or null.
+export const applyRunOutcome = async (runId, runStatus, { fetchResults = fetchRunResults } = {}) => {
+    const job = await Job.findOne({ 'apifyRuns.runId': runId }).select('jobId apifyRuns').lean();
+    if (!job) {
+        console.warn(`No job found for runId ${runId}`);
+        return null;
+    }
+    const run = job.apifyRuns.find((r) => r.runId === runId);
+    if (!run || run.status !== 'RUNNING') return job.jobId;   // already handled
+
+    if (runStatus === 'SUCCEEDED') {
+        const results = await fetchResults(runId);
+        console.log(`Run ${runId} finished with ${results.length} jobs`);
+        await Job.updateOne(
+            { jobId: job.jobId, 'apifyRuns.runId': runId },
+            {
+                $set: { 'apifyRuns.$.status': 'SUCCEEDED' },
+                $push: {
+                    scrapedJobs: {
+                        $each: results.map((item) => stripJobFields(normalizeJob(item, run.platform, run.keyword))),
+                    },
+                },
+            }
+        );
+    } else {
+        console.warn(`Run ${runId} ended with ${runStatus}`);
+        await Job.updateOne(
+            { jobId: job.jobId, 'apifyRuns.runId': runId },
+            { $set: { 'apifyRuns.$.status': runStatus } }
+        );
+    }
+    return job.jobId;
+};
+
+// After any run ends: fill the freed slot, then see whether jobs are complete.
+const afterRunEnded = async (jobId, { launch = undefined } = {}) => {
+    const touched = await launchDueSearches({ launch });
+    touched.add(jobId);
+    for (const id of touched) {
+        await finishJobIfComplete(id).catch((error) => console.error(`Job ${id}: finish check failed:`, error.message));
+    }
+};
+
 export const handleApifyWebhook = async (req, res) => {
     res.status(200).send('OK');
 
     try {
         const { eventType, resource } = req.body;
         const runId = resource?.id;
-        if (!runId) return;
-
-        const job = await Job.findOne({ 'apifyRuns.runId': runId });
-        if (!job) {
-            console.warn(`No job found for runId ${runId}`);
-            return;
-        }
-
         const runStatus = EVENT_TO_STATUS[eventType];
-        if (!runStatus) return;
+        if (!runId || !runStatus) return;
 
-        if (runStatus === 'SUCCEEDED') {
-            const run = job.apifyRuns.find((r) => r.runId === runId);
-            const results = await fetchRunResults(runId);
-            console.log(`Run ${runId} finished with ${results.length} jobs`);
-
-            // atomic update, no version conflict between parallel callbacks
-            await Job.updateOne(
-                { jobId: job.jobId, 'apifyRuns.runId': runId },
-                {
-                    $set: { 'apifyRuns.$.status': 'SUCCEEDED' },
-                    $push: {
-                        scrapedJobs: {
-                            $each: results.map((item) => stripJobFields(normalizeJob(item, run.platform, run.keyword))),
-                        },
-                    },
-                }
-            );
-        } else {
-            console.warn(`Run ${runId} ended with ${runStatus}`);
-            await Job.updateOne(
-                { jobId: job.jobId, 'apifyRuns.runId': runId },
-                { $set: { 'apifyRuns.$.status': runStatus } }
-            );
-        }
-
-        await finishJobIfComplete(job.jobId);
+        const jobId = await applyRunOutcome(runId, runStatus);
+        if (jobId) await afterRunEnded(jobId);
     } catch (error) {
         console.error('Webhook processing error:', error.message);
     }
+};
+
+/**
+ * Watchdog: runs still marked RUNNING after STALE_RUN_CHECK_MINUTES are
+ * checked directly with Apify. A run whose webhook never arrived (server
+ * asleep, stale PUBLIC_BASE_URL) is picked up here and its slot freed.
+ */
+export const reconcileStaleRuns = async ({ fetchStatus = fetchRunStatus, fetchResults = fetchRunResults, launch = undefined } = {}) => {
+    const cutoff = new Date(Date.now() - STALE_RUN_CHECK_MINUTES * 60 * 1000);
+    const jobs = await Job.find({
+        status: JOB_STATUS.SCRAPING,
+        apifyRuns: { $elemMatch: { status: 'RUNNING', runId: { $ne: null }, $or: [{ startedAt: { $lte: cutoff } }, { startedAt: null }] } },
+    }).select('jobId apifyRuns').lean();
+
+    const ended = new Set();
+    for (const job of jobs) {
+        const stale = job.apifyRuns.filter((r) => r.status === 'RUNNING' && r.runId && (!r.startedAt || new Date(r.startedAt) <= cutoff));
+        for (const run of stale) {
+            try {
+                const status = await fetchStatus(run.runId);
+                if (!status) continue;
+                if (APIFY_TERMINAL_STATUSES.includes(status)) {
+                    console.log(`Watchdog: run ${run.runId} is ${status} on Apify, recording it`);
+                    await applyRunOutcome(run.runId, status, { fetchResults });
+                    ended.add(job.jobId);
+                }
+            } catch (error) {
+                const code = error.response?.status;
+                if (code === 404) {
+                    console.warn(`Watchdog: run ${run.runId} not found on Apify, marking FAILED`);
+                    await applyRunOutcome(run.runId, 'FAILED');
+                    ended.add(job.jobId);
+                } else {
+                    console.error(`Watchdog: could not check run ${run.runId}:`, error.message);
+                }
+            }
+        }
+    }
+    for (const jobId of ended) await afterRunEnded(jobId, { launch });
 };
 
 /**

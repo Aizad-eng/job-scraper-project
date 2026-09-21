@@ -19,6 +19,7 @@ export default function BulkEditor({ count, onApply, onClose, busy }) {
     deliveryMode: UNCHANGED,
     cooldownDays: UNCHANGED,
     launchSpacingMinutes: UNCHANGED,
+    maxConcurrentRuns: UNCHANGED,
     salaryMin: UNCHANGED,
     salaryMax: UNCHANGED,
     webhookUrl: UNCHANGED,
@@ -36,7 +37,7 @@ export default function BulkEditor({ count, onApply, onClose, busy }) {
     changed.forEach(([key, value]) => {
       if (key === "runTime") schedule.runTime = value;
       else if (key === "skipAlreadySent") schedule.skipAlreadySent = value === "yes";
-      else if (["jobsPerKeyword", "cooldownDays", "launchSpacingMinutes", "salaryMin", "salaryMax"].includes(key)) {
+      else if (["jobsPerKeyword", "cooldownDays", "launchSpacingMinutes", "maxConcurrentRuns", "salaryMin", "salaryMax"].includes(key)) {
         inputs[key] = Number(value);
       } else inputs[key] = value;
     });
@@ -100,6 +101,7 @@ export default function BulkEditor({ count, onApply, onClose, busy }) {
         {select("deliveryMode", DELIVERY_MODE_OPTIONS, "Send")}
         {number("cooldownDays", "Company cooldown (days)")}
         {number("launchSpacingMinutes", "Minutes between keyword searches")}
+        {number("maxConcurrentRuns", "Actor runs at once (1–5)")}
         {number("salaryMin", "Min salary per year")}
         {number("salaryMax", "Max salary per year")}
         <div className="field">
