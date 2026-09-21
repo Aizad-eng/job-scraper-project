@@ -73,9 +73,10 @@ export const POSTED_WITHIN_LABELS = {
 };
 
 // Never more than this many actor runs in flight across every search and
-// schedule. Each search can ask for fewer (maxConcurrentRuns input).
-export const MAX_ACTOR_RUNS_GLOBAL = 5;
-export const DEFAULT_MAX_CONCURRENT_RUNS = 5;
+// schedule. Set MAX_ACTOR_RUNS in the environment to raise it (default 5).
+// Each search can ask for fewer (maxConcurrentRuns input).
+export const MAX_ACTOR_RUNS_GLOBAL = Math.min(Math.max(Math.round(Number(process.env.MAX_ACTOR_RUNS)) || 5, 1), 100);
+export const DEFAULT_MAX_CONCURRENT_RUNS = Math.min(5, MAX_ACTOR_RUNS_GLOBAL);
 
 // A run still marked RUNNING after this long is checked directly with Apify,
 // in case its webhook never arrived.

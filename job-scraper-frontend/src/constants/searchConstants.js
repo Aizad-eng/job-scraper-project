@@ -98,10 +98,11 @@ export const DEFAULT_FORM_VALUES = {
 };
 
 export const JOBS_PER_KEYWORD_MAX = 5000;
+// fallback until /api/config answers
 export const MAX_CONCURRENT_RUNS = 5;
 
 export const FIELD_HINTS = {
-    maxConcurrentRuns: 'Actor runs this search may have going at once. Never more than 5 across all searches and schedules together; the rest queue and start as runs finish.',
+    maxConcurrentRuns: 'Actor runs this search may have going at once. The server-wide ceiling (MAX_ACTOR_RUNS in Render, default 5) applies across all searches and schedules together; the rest queue and start as runs finish.',
     jobsPerKeyword: 'How many listings each title search may return, per board. Any number up to 5000.',
     keywords: 'Each title runs as its own search on every board you pick. Press Enter after each one.',
     location: 'City, state or country. Leave empty for anywhere.',

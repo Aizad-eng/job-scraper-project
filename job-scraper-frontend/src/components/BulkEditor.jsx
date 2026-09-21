@@ -101,7 +101,7 @@ export default function BulkEditor({ count, onApply, onClose, busy }) {
         {select("deliveryMode", DELIVERY_MODE_OPTIONS, "Send")}
         {number("cooldownDays", "Company cooldown (days)")}
         {number("launchSpacingMinutes", "Minutes between keyword searches")}
-        {number("maxConcurrentRuns", "Actor runs at once (1–5)")}
+        {number("maxConcurrentRuns", "Actor runs at once")}
         {number("salaryMin", "Min salary per year")}
         {number("salaryMax", "Max salary per year")}
         <div className="field">

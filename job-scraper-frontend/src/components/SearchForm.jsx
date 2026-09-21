@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import TagInput from "./TagInput.jsx";
 import ChipGroup from "./ChipGroup.jsx";
 import ScheduleFields from "./ScheduleFields.jsx";
@@ -25,7 +25,7 @@ import {
   describeRun,
   isValidWebhookUrl,
 } from "../helpers/formatHelpers.js";
-import { sendTestRow } from "../helpers/apiHelpers.js";
+import { sendTestRow, fetchConfig } from "../helpers/apiHelpers.js";
 import {
   getRememberedWebhook,
   rememberWebhook,
@@ -67,6 +67,14 @@ export default function SearchForm({
   const [showMore, setShowMore] = useState(false);
   const [test, setTest] = useState({ state: "idle", message: "" });
   const [repeat, setRepeat] = useState(editingSchedule ? "schedule" : "once");
+  const [maxRuns, setMaxRuns] = useState(MAX_CONCURRENT_RUNS);
+  useEffect(() => {
+    let cancelled = false;
+    fetchConfig()
+      .then((cfg) => { if (!cancelled && cfg?.maxActorRuns) setMaxRuns(cfg.maxActorRuns); })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, []);
   const [schedule, setSchedule] = useState(() => restoreSchedule(editingSchedule));
   const isSchedule = repeat === "schedule";
 
@@ -228,7 +236,7 @@ export default function SearchForm({
               id="maxConcurrentRuns"
               type="number"
               min="1"
-              max={MAX_CONCURRENT_RUNS}
+              max={maxRuns}
               step="1"
               className="text-input"
               value={values.maxConcurrentRuns}
@@ -236,11 +244,11 @@ export default function SearchForm({
               onBlur={() =>
                 setField(
                   "maxConcurrentRuns",
-                  Math.min(Math.max(Math.round(Number(values.maxConcurrentRuns)) || MAX_CONCURRENT_RUNS, 1), MAX_CONCURRENT_RUNS),
+                  Math.min(Math.max(Math.round(Number(values.maxConcurrentRuns)) || Math.min(5, maxRuns), 1), maxRuns),
                 )
               }
             />
-            <p className="field-hint below">{FIELD_HINTS.maxConcurrentRuns}</p>
+            <p className="field-hint below">Server ceiling is {maxRuns}. {FIELD_HINTS.maxConcurrentRuns}</p>
           </div>
 
           <div className="field">

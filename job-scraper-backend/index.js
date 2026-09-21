@@ -10,6 +10,7 @@ import webhookRoutes from './src/routes/webhook.routes.js';
 import scheduleRoutes from './src/routes/schedule.routes.js';
 import companyRoutes from './src/routes/company.routes.js';
 import { startScheduler } from './src/services/scheduler.service.js';
+import { MAX_ACTOR_RUNS_GLOBAL, DEFAULT_MAX_CONCURRENT_RUNS } from './src/constants/apifyConstants.js';
 import { requireAccessKey } from './src/middleware/auth.js';
 import { loginRateLimit } from './src/middleware/rateLimit.js';
 
@@ -37,6 +38,11 @@ app.get('/api/health', (req, res) => {
 // Costs nothing and starts no jobs — it only answers yes or no.
 app.post('/api/login', loginRateLimit, requireAccessKey, (req, res) => {
     res.json({ success: true });
+});
+
+// Limits the UI needs to know about.
+app.get('/api/config', requireAccessKey, (req, res) => {
+    res.json({ maxActorRuns: MAX_ACTOR_RUNS_GLOBAL, defaultActorRuns: DEFAULT_MAX_CONCURRENT_RUNS });
 });
 
 app.use('/api', scrapeRoutes);

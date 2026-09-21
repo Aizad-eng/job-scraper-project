@@ -102,6 +102,9 @@ CLAUDE_KEY=sk-ant-...
 OPENAI_API_KEY=sk-...
 PERPLEXITY_API_KEY=pplx-...
 
+# Most Apify actor runs in flight at once, across everything (default 5)
+MAX_ACTOR_RUNS=5
+
 # Where Apify sends its callback. Local: your ngrok URL. Production: your
 # Render URL. No trailing slash.
 PUBLIC_BASE_URL=https://your-subdomain.ngrok-free.app
@@ -162,7 +165,7 @@ The **Schedules** tab lists every saved schedule with its next run, last run, an
 
 **Scale.** Listings are not stored on the job. Each page of an Apify run (500 rows) is normalised, deduplicated by the `listings` collection's unique indexes (same listing from another keyword, same title at the same company from the other board) and rule-filtered as it arrives; only listings that pass are stored, one document each, with the description capped at 12,000 characters, and they expire after 14 days. The job keeps counts (`scrapedCount`, `keptCount`, `finalCount`, `removedByReason`) and a 200-row sample of what was removed. Every later stage (domains, salaries, titles, agency check, cap, cooldown, delivery) walks the kept listings in batches of 200, so a run of 30,000 or 300,000 listings uses the same memory and never touches Mongo's 16 MB document limit. A 30,000-listing run ingests in seconds and delivers in batches.
 
-**Concurrency cap.** Never more than **5 actor runs in flight** across every search and schedule together. Every keyword × board search is queued on its job and started as slots free up, oldest job first; *Actor runs at once* (step 1, default 5, max 5) lets a search use fewer. A watchdog checks any run still marked running after 5 minutes directly with Apify, so a callback that never arrived (server asleep, stale `PUBLIC_BASE_URL`) cannot hold a slot or stall a job. The run page shows running / queued counts.
+**Concurrency cap.** Never more than `MAX_ACTOR_RUNS` actor runs in flight (environment variable, default 5) across every search and schedule together. Raise it in Render's Environment tab when your Apify plan allows more; the form's *Actor runs at once* field follows the ceiling. Every keyword × board search is queued on its job and started as slots free up, oldest job first; *Actor runs at once* (step 1, default 5) lets a search use fewer. A watchdog checks any run still marked running after 5 minutes directly with Apify, so a callback that never arrived (server asleep, stale `PUBLIC_BASE_URL`) cannot hold a slot or stall a job. The run page shows running / queued counts.
 
 **Keyword spacing.** A schedule can space its keyword searches out: *Minutes between keyword searches* (default 20 for schedules, 0 for one-off runs). The first keyword starts at the scheduled time on every board; each next keyword starts that many minutes later. The queued searches live on the job (`pendingLaunches`) and the same 30-second tick launches them when due, so a restart in between loses nothing. Filtering and delivery happen once, after the last search has finished. The run page shows how many are queued and when the next starts.
 
