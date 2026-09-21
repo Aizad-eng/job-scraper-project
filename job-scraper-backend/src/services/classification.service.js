@@ -1,6 +1,6 @@
 import { classifyWithGpt, classifyWithPerplexity } from './ai.service.js';
 import { askScrapingDog, hasScrapingDog } from './scrapingdog.service.js';
-import { coerceCompanyCheck, hasClaude } from './claude.service.js';
+import { coerceCompanyCheck, hasClaude, noteClaudeError, describeClaudeError } from './claude.service.js';
 import { CLASSIFICATION_SOURCE, AI_BATCH_SIZE, AI_BATCH_DELAY_MS } from '../constants/aiConstants.js';
 
 // Yes -> agency, No -> direct employer, Unknown -> undecided (kept, not dropped)
@@ -16,13 +16,31 @@ const fromCompanyCheck = (check, source) => ({
 // answer that is not clean JSON. Returns null when it cannot decide, so the
 // caller can fall back to the older classifiers.
 const checkWithScrapingDog = async (company, deps) => {
-    const { text, parsed } = await askScrapingDog(company.companyWebsite, deps);
+    // Without Claude, most AI Mode answers (prose) cannot be read: do not
+    // spend ScrapingDog credits on them.
+    if (!hasClaude() && !deps.anthropic) {
+        console.warn(`Skipping ScrapingDog for ${company.companyName}: Claude unavailable, answer could not be structured`);
+        return null;
+    }
 
+    let answer;
+    try {
+        answer = await askScrapingDog(company.companyWebsite, deps);
+    } catch (error) {
+        console.error(`ScrapingDog failed for ${company.companyName}:`, error.response?.status || error.message);
+        return null;
+    }
+    const { text, parsed } = answer;
     if (parsed) return fromCompanyCheck(parsed, CLASSIFICATION_SOURCE.SCRAPINGDOG);
 
-    if (text && (hasClaude() || deps.anthropic)) {
-        const fixed = await coerceCompanyCheck(text, company.companyWebsite, deps);
-        if (fixed) return fromCompanyCheck(fixed, CLASSIFICATION_SOURCE.SCRAPINGDOG_CLAUDE);
+    if (text) {
+        try {
+            const fixed = await coerceCompanyCheck(text, company.companyWebsite, deps);
+            if (fixed) return fromCompanyCheck(fixed, CLASSIFICATION_SOURCE.SCRAPINGDOG_CLAUDE);
+        } catch (error) {
+            noteClaudeError(error);
+            console.error(`${describeClaudeError(error)} — while structuring the answer for ${company.companyName}`);
+        }
     }
 
     return null;
@@ -30,13 +48,9 @@ const checkWithScrapingDog = async (company, deps) => {
 
 export const classifyOne = async (company, deps = {}) => {
     if (company.companyWebsite && (hasScrapingDog() || deps.request)) {
-        try {
-            const result = await checkWithScrapingDog(company, deps);
-            if (result) return result;
-            console.warn(`ScrapingDog gave no usable answer for ${company.companyName}, falling back`);
-        } catch (error) {
-            console.error(`ScrapingDog failed for ${company.companyName}:`, error.response?.status || error.message);
-        }
+        const result = await checkWithScrapingDog(company, deps);
+        if (result) return result;
+        console.warn(`No usable company check for ${company.companyName}, falling back`);
     }
 
     try {

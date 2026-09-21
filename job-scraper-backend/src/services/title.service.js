@@ -4,7 +4,7 @@ import { z } from 'zod';
 import TitleClean from '../models/titleClean.model.js';
 import { cleanTitleWithRules, titleKey } from '../helpers/titleHelpers.js';
 import { createLimiter } from '../helpers/limiter.js';
-import { hasClaude } from './claude.service.js';
+import { hasClaude, noteClaudeError, describeClaudeError } from './claude.service.js';
 import { SALARY_MODEL as TITLE_MODEL } from '../constants/salaryConstants.js';
 
 const TITLE_SYSTEM_PROMPT =
@@ -84,7 +84,8 @@ export const resolveTitles = async (jobs, { useClaude = true, deps = {} } = {}) 
                 if (polished) { clean = polished; source = 'claude'; }
             } catch (error) {
                 stats.failed += 1;
-                console.error(`Title clean failed for "${raw}":`, error.message);
+                noteClaudeError(error);
+                console.error(`${describeClaudeError(error)} — title clean for "${raw}"`);
             }
         }
 

@@ -10,7 +10,7 @@ import {
 } from '../constants/salaryConstants.js';
 import { parseSalaryText, applySalary, hasSalary } from '../helpers/salaryHelpers.js';
 import { createLimiter } from '../helpers/limiter.js';
-import { hasClaude } from './claude.service.js';
+import { hasClaude, noteClaudeError, describeClaudeError } from './claude.service.js';
 
 const SalarySchema = z.object({
     found: z.boolean(),
@@ -118,7 +118,8 @@ export const resolveSalaries = async (jobs, { useClaude = true, deps = {} } = {}
             stats.none += 1;
         } catch (error) {
             stats.failed += 1;
-            console.error(`Salary extraction failed for "${job.title}":`, error.message);
+            noteClaudeError(error);
+            console.error(`${describeClaudeError(error)} — salary extraction for "${job.title}"`);
         }
     }));
 

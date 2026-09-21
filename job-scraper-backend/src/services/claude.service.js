@@ -3,7 +3,27 @@ import { zodOutputFormat } from '@anthropic-ai/sdk/helpers/zod';
 import { z } from 'zod';
 import { CLAUDE_MODEL, CLAUDE_COERCE_SYSTEM_PROMPT } from '../constants/aiConstants.js';
 
-export const hasClaude = () => Boolean(process.env.CLAUDE_KEY);
+export const hasClaude = () => Boolean(process.env.CLAUDE_KEY) && !claudeDisabledUntil();
+
+// When Claude reports no credit, calls are paused for an hour so ScrapingDog
+// credits are not spent on answers nothing can read.
+let disabledUntil = 0;
+export const claudeDisabledUntil = () => (Date.now() < disabledUntil ? disabledUntil : 0);
+export const noteClaudeError = (error) => {
+    const message = error?.error?.error?.message || error?.message || '';
+    const status = error?.status ?? error?.response?.status;
+    if (/credit balance is too low/i.test(message) || status === 402) {
+        disabledUntil = Date.now() + 60 * 60 * 1000;
+        console.error('Claude: no credit on the Anthropic account. Pausing Claude calls for 1 hour. Top up at console.anthropic.com → Plans & Billing.');
+        return true;
+    }
+    return false;
+};
+
+export const describeClaudeError = (error) => {
+    const message = error?.error?.error?.message || error?.message || 'unknown error';
+    return `Claude (Anthropic API): ${message}`;
+};
 
 const CompanyCheckSchema = z.object({
     website: z.string(),
