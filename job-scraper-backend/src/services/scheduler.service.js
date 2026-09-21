@@ -2,7 +2,7 @@ import { randomUUID } from 'crypto';
 import Schedule from '../models/schedule.model.js';
 import { launchSearch } from './search.service.js';
 import { launchDueSearches } from './launchQueue.service.js';
-import { finishJobIfComplete, reconcileStaleRuns } from '../controllers/webhook.controller.js';
+import { finishJobIfComplete, reconcileStaleRuns, resumeInterruptedJobs } from '../controllers/webhook.controller.js';
 import { computeNextRun } from '../helpers/scheduleHelpers.js';
 import { SCHEDULER_TICK_MS } from '../constants/scheduleConstants.js';
 
@@ -91,6 +91,8 @@ export const startScheduler = () => {
 
     // Anything left "launching" by a crash gets released on boot.
     Schedule.updateMany({ launching: true }, { $set: { launching: false } }).catch(() => {});
+    // Jobs that were mid-pipeline when the process died are picked up again.
+    resumeInterruptedJobs().catch((error) => console.error('Resume after restart failed:', error.message));
 
     const safeTick = () => tick().catch((error) => console.error('Scheduler tick failed:', error.message));
     safeTick();

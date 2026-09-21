@@ -77,7 +77,7 @@ export const classifyCompanies = async (companies, deps = {}, onProgress = null)
             batch.map(async (company) => [company.key, await classifyOne(company, deps)])
         );
         classified.forEach(([key, result]) => results.set(key, result));
-        if (onProgress) await onProgress(results.size, companies.length);
+        if (onProgress) await onProgress(results.size, companies.length, results);
 
         if (AI_BATCH_DELAY_MS > 0 && i + AI_BATCH_SIZE < companies.length) {
             await new Promise((resolve) => setTimeout(resolve, AI_BATCH_DELAY_MS));

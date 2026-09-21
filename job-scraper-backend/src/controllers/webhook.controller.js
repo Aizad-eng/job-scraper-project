@@ -269,6 +269,32 @@ const dropListings = async (jobId, ids, reason, samples = []) => {
 
 const COMPANY_PROJECTION = 'jobId companyKey data.title data.link data.location data.postedAt data.platform data.searchKeyword data.seniorityLevel data.employmentType data.salaryMinPerYear data.salaryMaxPerYear data.salaryCurrency data.salarySource data.jobTitleClean data.companyName data.companyDomain data.companyWebsite data.companyIndustry data.companyDescription data.companyEmployeesCount data.companyHeadquarters data.companyType data.companyFounded data.companyLinkedinUrl data.companyProfileUrl data.companyDomainSource data.companySpecialties data.isStaffingAgency data.agencyReason data.aiIndustry data.aiSummary data.aiSource';
 
+/**
+ * On startup: any job that was mid-pipeline when the process died is run
+ * again from the top. Stages are safe to repeat (memory and cooldown stop
+ * repeat spending and repeat sends). Jobs from before the Listing collection
+ * existed cannot be resumed and are marked failed with a clear reason.
+ */
+export const resumeInterruptedJobs = async () => {
+    const stuck = await Job.find({ status: { $in: [JOB_STATUS.FILTERING, JOB_STATUS.CLASSIFYING, JOB_STATUS.DELIVERING] } })
+        .select('jobId status scrapedCount keptCount scrapedJobs').lean();
+    for (const job of stuck) {
+        const oldLayout = Array.isArray(job.scrapedJobs) && job.scrapedJobs.length > 0 && !job.keptCount;
+        if (oldLayout || !(await Listing.exists({ jobId: job.jobId }))) {
+            console.warn(`Job ${job.jobId}: interrupted before listing storage existed, cannot resume`);
+            await setStatus(job.jobId, {
+                status: JOB_STATUS.FAILED,
+                progress: null,
+                error: 'The server restarted while this run was in progress and it could not be resumed. Run it again with the same settings.',
+            });
+            continue;
+        }
+        console.log(`Job ${job.jobId}: resuming after restart (was ${job.status})`);
+        const claimed = await Job.findOneAndUpdate({ jobId: job.jobId }, { $set: { status: JOB_STATUS.FILTERING, progress: null } }, { returnDocument: 'after' }).lean();
+        runPipeline(claimed).catch((error) => console.error(`Job ${job.jobId}: resume failed:`, error.message));
+    }
+};
+
 // ---------------------------------------------------------------------------
 // The pipeline
 // ---------------------------------------------------------------------------
@@ -349,12 +375,19 @@ const runPipeline = async (job) => {
             await setProgress(jobId, `Checking companies with ScrapingDog (${verdicts.size} already known)`, 0, toCheck.length, { force: true });
 
             if (toCheck.length) {
-                const fresh = await classifyCompanies(toCheck, {}, async (checked, total) => {
+                // verdicts are saved to company memory after every batch, so a
+                // crash mid-stage keeps what was already paid for
+                let savedUpTo = 0;
+                const fresh = await classifyCompanies(toCheck, {}, async (checked, total, partial) => {
                     await setProgress(jobId, `Checking companies with ScrapingDog (${verdicts.size} already known)`, checked, total);
+                    if (partial && partial.size > savedUpTo) {
+                        const slice = new Map([...partial.entries()].slice(savedUpTo));
+                        savedUpTo = partial.size;
+                        try { await saveVerdicts(slice); } catch (error) { console.error(`Job ${jobId}: could not save verdicts:`, error.message); }
+                    }
                     if (checked === total) await setStatus(jobId, { 'agencyCheck.checked': checked });
                 });
                 fresh.forEach((v, k) => verdicts.set(k, v));
-                try { await saveVerdicts(fresh); } catch (error) { console.error(`Job ${jobId}: could not save verdicts:`, error.message); }
             }
 
             const dropAgencies = inputs.agencyMode === AGENCY_MODE.REMOVE || inputs.agencyMode === AGENCY_MODE.KEYWORDS;

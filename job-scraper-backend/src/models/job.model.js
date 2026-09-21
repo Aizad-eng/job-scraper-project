@@ -70,6 +70,8 @@ const jobSchema = new mongoose.Schema(
                 launchAt: Date,
             },
         ],
+        // Runs from before the Listing collection stored listings here.
+        scrapedJobs: { type: Array, default: undefined },
         // Listings live in the Listing collection. The job keeps counts.
         scrapedCount: { type: Number, default: 0 },     // everything the actors returned
         keptCount: { type: Number, default: 0 },        // passed dedupe + rule filters
