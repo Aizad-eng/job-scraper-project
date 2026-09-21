@@ -7,7 +7,7 @@ export const PRESETS = [
     {
         id: 'senior-leadership',
         label: 'Senior leadership (retained search)',
-        hint: 'Director, VP and C-level roles only (no "head of"). Whole-word matching on the job title, the usual title traps excluded (assistant to, art director, principal engineer, HR business partner…), VP titles at banks dropped, salary floor 150,000 with unknown pay kept.',
+        hint: 'Director, VP and C-level roles only (no "head of"). Whole-word matching on the job title, the usual title traps excluded (assistant to, art director, principal engineer, HR business partner…), VP titles at banks dropped. No salary floor; set one in Salary per year if you want it.',
         apply: {
             filterKeywords: split(
                 'chief, chief executive officer, chief executive, chief financial officer, chief operating officer, chief operations officer, ' +
@@ -44,7 +44,7 @@ export const PRESETS = [
             dropBankVps: true,
             seniorityLevels: ['Director', 'Executive'],
             employmentTypes: ['Full-time'],
-            salaryMin: 150000,
+            salaryMin: '',
             salaryMax: '',
             includeNoSalary: true,
         },
