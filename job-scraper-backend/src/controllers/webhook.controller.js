@@ -462,6 +462,7 @@ const runPipeline = async (job) => {
                     'delivery.failed': totals.failed + failed,
                     'delivery.lastError': lastError || totals.lastError,
                 } });
+                await setProgress(jobId, 'Sending rows to your webhook', totals.sent + totals.failed + sent + failed, finalCount);
             });
             totals.sent += outcome.sent;
             totals.failed += outcome.failed;
